@@ -40,7 +40,7 @@ The main ideas here are:
   - Each bar for each hand should be generated in the following way:
     - Start with a single note from the user's range, that fills the entire bar (e.g., whole note for 4/4 time), in one of the user's selected octaves
     - Loop:
-      - Randomly pick a note in the bar and split the note into smaller notes, following the duration probabilities above, with the constraint that the sum of the durations of the smaller notes equals the duration of the original note
+      - Randomly pick a note in the bar and split the note into smaller notes, with the constraint that the sum of the durations of the smaller notes equals the duration of the original note
       - With a probability of 0.1, make a note a rest
       - Continue the loop until:
         - The bar only contains note durations allowed by the user

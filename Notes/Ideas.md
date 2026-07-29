@@ -17,8 +17,7 @@ The main ideas here are:
       - Durations (for now only eighth, quarter, half, whole, dotted half, dotted quarter)
       - One or more octaves (from octave 2 to 6)
     - Third, when generating two-hand pieces:
-      - Range of pitches for each hand (e.g., from C3 to C5)
-      - The ranges may not overlap, and the left hand's notes should be below the right hand's notes
+      - Split point for all the available pitches, so that the pitches below the split point go to the left hand and the pitches above the split point go to the right hand
   - Finally:
     - Present a summary for user approval. There should be 'Back' buttons on each step to allow the user to go back and change their selections, and a 'Generate' button to generate the music as a web page, and a 'PDF' button to generate a PDF for download.
 - The music should then be generated randomly from the list of notes, durations, octaves, and hand(s) selected

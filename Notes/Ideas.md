@@ -81,7 +81,7 @@ The main ideas here are:
     - Notes played by the left hand should have stems pointing down
     - The server will invoke the lilypond web application via a separate web application, accessed via HTTP POST with a JSON body containing the LilyPond code, and a Bearer token for authentication. It will return an SVG of the sheet music or an error message.
     - The server will embed the SVG in the page returned to the browser, after sanitization with the DOMPurify and jsdom libraries.
-  - The returned page will contain the full final form with all user choices presented, and the same form for generation with hidden fields documenting the user's choices.
+  - The returned page will contain the full final description of the user's choices, and Back links to allow the user to go back and change any of the choices.
   - All form values will be validated by the server and appropriate error messages returned to allow the user to correct any invalid input.
   - The server will limit the user to one successful etude generation per minute. Separately, successful PDF generation will be limited to one per minute as well, but tracked separately so the user can generate a PDF right after getting the web page version.
 

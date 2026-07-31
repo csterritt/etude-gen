@@ -27,9 +27,9 @@ A completed etude will remain the same across refreshes and PDF download, while 
 11. As a student, I want C7 to be the only possible octave-7 pitch and to appear only when C natural belongs to the selected key and falls within the expanded range, so that the upper boundary is predictable.
 12. As a student, I want to choose left hand, right hand, or both hands, so that the etude targets the intended coordination skill.
 13. As a student, I want all available key pitches selected by default on the notes step, so that the default produces a complete scale-based exercise.
-14. As a student, I want to select one or more available pitches, so that I can narrow the exercise to specific notes.
+14. As a student, I want to select one or more available pitches for one-hand mode and at least two for two-hand mode, so that I can narrow the exercise while leaving a playable pitch range for each selected hand.
 15. As a student, I want a Select all control, so that restoring the full pitch set is quick.
-16. As a student without client-side scripting, I want Select all and form submission still to work through server requests, so that progressive enhancement is not required for completion.
+16. As a screen-reader or keyboard user, I want focus moved to the score heading after successful generation or rendering retry, so that I can reach the result without navigating again from the top of the page.
 17. As a student, I want compatible durations selected by default, so that the initial rhythm selection is usable.
 18. As a student, I want to choose among eighth, quarter, half, whole, dotted-half, and dotted-quarter notes when they can fit the selected meter, so that I can target rhythmic skills.
 19. As a student, I want the duration controls to prevent a selection that cannot form any complete measure, so that I do not reach review with an impossible rhythm set.
@@ -50,7 +50,7 @@ A completed etude will remain the same across refreshes and PDF download, while 
 34. As a student, I want rests to occur occasionally without unrestricted identical consecutive rests, so that the rhythm varies while remaining intentional.
 35. As a student, I want two-hand etudes sometimes to share rhythmic structure while retaining independently selected pitches, so that the hands sometimes coordinate without always moving identically.
 36. As a student, I want right-hand notes on a treble staff with upward stems and left-hand notes on a bass staff with downward stems, so that hand assignment is visually clear.
-37. As a student generating one hand, I want the score to remain on a grand staff with the unused staff empty, so that all generated scores use a consistent piano layout.
+37. As a student generating one hand, I want the score to remain on a grand staff with the unused staff showing the key and time signatures but no notes or rests, so that all generated scores use a consistent piano layout.
 38. As a student, I want the score to show the selected key and time signature, so that it is ready for practice.
 39. As a student, I want the generated page to repeat my complete settings above the score, so that I can connect the result to its constraints.
 40. As a student using assistive technology, I want a structured measure-by-measure text equivalent listing each hand's notes, rests, and durations, so that the generated music has useful nonvisual content.
@@ -69,7 +69,7 @@ A completed etude will remain the same across refreshes and PDF download, while 
 53. As a student, I want a PDF generated from the exact stored Piece displayed as SVG, so that the download and web score contain the same music.
 54. As a student, I want PDF generation independently limited to one successful result per minute, so that I can create a PDF immediately after generating an SVG while repeated PDF work remains controlled.
 55. As a student, I want failed PDF attempts not to consume the PDF cooldown, so that I can recover from service or storage failures.
-56. As a student, I want a successful PDF delivered as a safely named attachment after a server redirect, so that form submission follows POST-redirect-to-GET without exposing the object publicly.
+56. As a student, I want a successful PDF delivered after a server redirect as an attachment named `etude-<piece-short-id>.pdf`, so that form submission follows POST-redirect-to-GET with a predictable safe filename and without exposing the object publicly.
 57. As a student, I want the temporary PDF download to remain available for 15 minutes and permit one download, so that the immediate download can complete without creating lasting storage.
 58. As a student, I want an expired, consumed, or missing PDF download redirected to my score with an actionable safe error, so that I can recover within the normal workflow.
 59. As a student, I want Start a new piece to clear all current parameters, Piece data, score artifacts, operation state, and download grants, so that I can begin from clean defaults.
@@ -106,10 +106,11 @@ A completed etude will remain the same across refreshes and PDF download, while 
 - Supported minor keys are A, E, B, F-sharp, C-sharp, D, G, C, and F natural minor.
 - Pitches are the seven diatonic notes of the selected key and use conventional key-signature spelling.
 - The student selects one or more keyboard scale ranges identified by octaves 2 through 6. The lowest and highest selections establish a continuous expanded range that includes every intervening scale range. Each range is derived tonic-to-tonic before the global upper cap is applied. Every scientific-pitch octave-7 note is then excluded except C7; C7 remains available only when C natural belongs to the selected key and it occurs in the expanded range.
-- At least one pitch is required. For both hands, the split is a boundary between adjacent selected pitches, with lower pitches assigned left and higher pitches assigned right; both sets must be non-empty.
+- One-hand mode requires at least one selected pitch. Two-hand mode requires at least two selected pitches so a boundary can leave both hands non-empty. The notes step rejects a smaller selection with the field-level message “Select at least two pitches when using both hands.”
+- For both hands, the split is a boundary between adjacent selected pitches, with lower pitches assigned left and higher pitches assigned right; both sets must be non-empty.
 - Supported duration tokens are whole (`W`), half (`H`), dotted half (`D`), quarter (`Q`), dotted quarter (`R`), and eighth (`E`). The curated text catalog is the authoritative build-time input for complete-measure patterns: each time-signature heading is followed by one token sequence per line.
 - A rhythm is eligible only when every token it contains is selected. A submitted duration set is valid only if at least one eligible complete-measure pattern exists.
-- Minimal client TypeScript is approved only to enhance Select all and disable duration toggles that would leave no eligible rhythm. Server controls and validation provide a complete no-script fallback.
+- Minimal client TypeScript is approved only to enhance Select all and disable duration toggles that would leave no eligible rhythm. Select all and form submission work through server requests without scripting, and server controls and validation provide a complete no-script fallback.
 
 ### Piece model and generation
 
@@ -121,7 +122,9 @@ A completed etude will remain the same across refreshes and PDF download, while 
 - After a pitched event, each available target pitch no more than 12 semitones away receives the supplied probability weight for its absolute interval; those target weights are normalized and sampled. Targets over 12 semitones away have zero transition weight.
 - Interval weights are: 0 = 0.0932197441181743, 1 = 0.0755079927357212, 2 = 0.121143267210103, 3 = 0.109028940489093, 4 = 0.0981260464401835, 5 = 0.0883134417961651, 6 = 0.0794820976165486, 7 = 0.0715338878548937, 8 = 0.0643804990694044, 9 = 0.0579424491624639, 10 = 0.0521482042462175, 11 = 0.0469333838215958, and 12 = 0.0422400454394362.
 - After a rest, the next pitch is uniform across the hand's selected pitches rather than interval-weighted.
+- The left hand’s first pitched event follows the same first-pitched-event rule whether its first rhythm is mirrored or independent: it is selected uniformly across the left hand’s pitches. Rest positions before that event do not establish a current pitch.
 - In freshly generated material, a rest may follow a rest only when the durations differ. This constraint carries across measure boundaries.
+- After every completed bar, including an exactly repeated bar or a mirrored-rhythm bar, the hand’s current pitch becomes the last pitched event in that completed bar. Trailing rests do not clear it; the next interval-weighted fresh pitch transitions from that last pitched event. If the hand has produced no pitched event yet, its first pitched event uses the uniform first-pitch rule.
 - For a single-hand Piece, and for the right hand of a two-hand Piece, each bar after the first has a 20% repeated-bar event. An eligible source is selected among prior bars with linear recency weights: oldest weight 1 through newest weight N.
 - A repeated source whose opening pitched event would require a transition over 12 semitones is ineligible. If no prior source is eligible, a fresh bar is generated.
 - An accepted repeated bar copies rhythm, pitches, and rests exactly. Exact repeated rest structure may override the same-duration consecutive-rest rule at a measure boundary.
@@ -136,10 +139,13 @@ A completed etude will remain the same across refreshes and PDF download, while 
 - All three records reference the authenticated user with uniqueness and cascade-deletion semantics.
 - Conditional writes enforce workflow versions and per-user lock acquisition. Routes never implement read-then-unconditionally-write concurrency.
 - New-Piece generation and PDF generation each have two distinct controls: an in-flight lock that prevents concurrent work and a last-success timestamp that enforces a post-success cooldown.
-- An in-flight lock expires exactly 60 seconds after acquisition. An expired lock may be atomically replaced by a later request.
+- Each acquired lock has an unpredictable owner identifier held by that request. Every completion, state commit, and release conditionally verifies that the current lock owner identifier still matches; a request whose expired lock was replaced cannot commit results or release its replacement’s lock.
+- An in-flight lock expires exactly 60 seconds after acquisition. An expired lock may be atomically replaced by a later request. Expiry is crash-recovery safety, not the normal release path.
+- Work proceeds in this order while the request owns the lock: domain validation and Piece generation, conditional Piece persistence and supersession, LilyPond call, response validation/sanitization, private R2 write, and final conditional render-state commit. This preserves the new Piece for rendering retry while preventing a request that lost its lease from publishing a result. The 30-second default service timeout leaves budget within the 60-second lease for local processing; every stage still verifies ownership before committing.
 - The new-Piece cooldown lasts exactly 60 seconds and starts only after Piece persistence, valid SVG receipt, sanitization, private R2 persistence, and final D1 state update all succeed.
 - Rendering retry reuses the saved Piece, does not create random music, and is not blocked by the new-Piece cooldown. It still uses the generation/render in-flight lock.
 - The PDF cooldown lasts exactly 60 seconds and starts only after a valid PDF is persisted privately and its one-time grant is committed. Service, validation, or storage failures do not consume it.
+- Every non-success path after acquisition, including validation, rendering, sanitization, storage, conflict, and final-commit failure, conditionally releases its own lock. Successful completion also conditionally releases it; lock expiry is used only when the owning request cannot perform release.
 - Current data has no inactivity expiration. It remains until Start Over, replacement, or account deletion.
 
 ### HTTP routes and interaction contract
@@ -150,18 +156,19 @@ A completed etude will remain the same across refreshes and PDF download, while 
 - The conditional two-hand boundary uses `GET /etude/split` and `POST /etude/split`.
 - Review uses `GET /etude/review`.
 - New-Piece generation uses `POST /etude/generate` and redirects to the score or retry state.
-- The current score uses `GET /etude/score`.
+- The current score uses `GET /etude/score`. If no current Piece exists, it redirects with a safe message to the earliest incomplete canonical step.
 - Rendering recovery uses `POST /etude/render/retry`.
 - PDF creation uses `POST /etude/pdf`. Success creates a grant and redirects to an authenticated download GET identified by an opaque grant identifier.
 - Start Over uses `POST /etude/start-over`.
-- Direct access to a step with unmet prerequisites redirects to the earliest incomplete canonical step with a safe message.
+- Direct access to any step or score with unmet prerequisites redirects to the earliest incomplete canonical step with a safe message.
 - A temporary PDF grant belongs to the authenticated user, expires after 15 minutes, and can be consumed once. Expired, consumed, foreign, or missing grants never expose object details and redirect the owner to the score with a safe error where applicable.
 - Any later etude activity by that owner detects expired grants, atomically revokes them, and attempts physical PDF cleanup. Grant expiry itself does not require a background job.
-- The attachment filename is generated by the server from a fixed safe pattern and never from untrusted form input.
+- The attachment filename is `etude-<piece-short-id>.pdf`, where `<piece-short-id>` is the first eight lowercase hexadecimal characters of the server-generated Piece UUID. It is generated entirely by the server and never from untrusted form input.
+- Setup, notes, and split POSTs have no etude-specific cooldown or rate limiter in v1. Existing authenticated-session, CSRF, request-size, and platform request protections apply; their comparatively cheap repeated submission is an accepted v1 risk.
 
 ### LilyPond and artifact contracts
 
-- The application serializes the authoritative Piece to LilyPond source. The output is a grand staff with fixed treble/right and bass/left mapping, selected key and time signature, upward right-hand stems, and downward left-hand stems. The unused staff remains empty.
+- The application serializes the authoritative Piece to LilyPond source. The output is a grand staff with fixed treble/right and bass/left mapping, selected key and time signature, upward right-hand stems, and downward left-hand stems. For a one-hand Piece, the unused staff contains no notes or rests but still displays the selected key and time signature.
 - V1 output has no title, composer, tempo, dynamics, fingering, articulation, or measure-number metadata.
 - The configured service base URL is joined with `/generate` for SVG and `/pdf` for PDF.
 - Requests use HTTP POST, JSON content type, a JSON string field named `lilypond`, and Bearer authentication from a secret binding.
@@ -175,7 +182,7 @@ A completed etude will remain the same across refreshes and PDF download, while 
 - Sanitized SVG is stored in private R2 and has no public URL. The authenticated application retrieves it through the binding after checking current user ownership and Piece version.
 - PDF is stored in private R2 only for the grant lifecycle. The download GET prepares the bounded attachment, atomically consumes the grant, and initiates object cleanup.
 - Replacing a Piece, Start Over, grant consumption/expiry, and account deletion revoke D1 reachability before or regardless of cleanup completion.
-- Artifact deletion makes one initial attempt followed by three retries delayed 100, 200, and 400 milliseconds. Exhaustion logs the opaque object identifier and correlation ID for privileged cleanup; the user operation proceeds and the object remains unreachable.
+- Artifact deletion makes one initial attempt followed by three retries delayed 100, 200, and 400 milliseconds. Exhaustion emits a structured `artifact_cleanup_exhausted` log with `artifactId`, `artifactKind` (`svg` or `pdf`), `cleanupReason` (`replacement`, `start_over`, `grant_consumed`, `grant_expired`, or `account_deleted`), `attemptCount`, `lastErrorCategory`, `correlationId`, and `occurredAt`. The opaque artifact identifier contains no user identifier; the user operation proceeds and the object remains unreachable.
 - R2 write failure after valid SVG/PDF receipt does not consume the corresponding cooldown. SVG failure retains the Piece for Retry rendering; PDF failure returns to the current score.
 
 ### Validation, errors, logging, and accessibility
@@ -186,7 +193,7 @@ A completed etude will remain the same across refreshes and PDF download, while 
 - Every request receives an application-generated UUID. It is included in structured logs and the `X-Correlation-ID` response header; unexpected user-facing errors include it.
 - Logs contain no names, email addresses, session values, Bearer tokens, secrets, raw service credentials, or LilyPond request bodies. Artifact identifiers logged for orphan cleanup are opaque and contain no user identifier.
 - Form controls have programmatic labels, instructions are associated with their fields, error summaries link to invalid controls, and errors use semantic status/alert behavior.
-- Only invalid submissions programmatically focus the error summary. Successful full-page navigation relies on logical heading order and browser navigation behavior.
+- Invalid submissions programmatically focus the error summary. After successful generation or rendering retry, one-time server-managed navigation state causes the score heading/region to receive programmatic focus; other successful full-page navigation relies on logical heading order and browser navigation behavior.
 - The score page provides a structured textual representation of key, time signature, and each measure's right- and left-hand pitches/rests and durations. It is derived from the authoritative Piece rather than parsed from SVG.
 - The embedded sanitized SVG is noninteractive, has an accessible relationship to the structured text, and does not create duplicate or misleading screen-reader content.
 
@@ -217,7 +224,7 @@ A completed etude will remain the same across refreshes and PDF download, while 
 
 - **Name**: Etude Repository
 - **Responsibility**: Own persistence and atomic transition semantics for the one current D1 aggregate.
-- **Interface**: Loads owner-scoped workflow snapshots; creates or updates parameters by expected version; commits/revokes Pieces and artifact metadata; atomically acquires/releases/recovers locks; checks/records independent cooldowns; creates, consumes, and revokes PDF grants; and returns typed conflict, missing, ownership, or storage failures.
+- **Interface**: Loads owner-scoped workflow snapshots; creates or updates parameters by expected version; commits/revokes Pieces and artifact metadata; atomically acquires, verifies, releases, or recovers locks by owner identifier; checks/records independent cooldowns; creates, consumes, and revokes PDF grants; and returns typed conflict, missing, ownership, or storage failures.
 - **Tested**: yes
 
 ### Artifact Store
@@ -246,7 +253,7 @@ A completed etude will remain the same across refreshes and PDF download, while 
 - **Name**: Score Presenter
 - **Responsibility**: Produce the safe score-page presentation and equivalent structured textual score from a current Piece and sanitized artifact.
 - **Interface**: Accepts an owner-authorized current Piece, its validated sanitized SVG, and render metadata; returns server-renderable score content and structured measure text. Missing or stale artifacts produce a retry state rather than score content.
-- **Tested**: yes, through Playwright behavior rather than dedicated unit tests
+- **Tested**: yes, with Bun tests for Piece-to-structured-text behavior and Playwright tests for page integration, focus, and accessibility wiring
 
 ### Etude Web Interface
 
@@ -259,15 +266,16 @@ A completed etude will remain the same across refreshes and PDF download, while 
 
 - Tests must assert externally observable behavior and domain invariants rather than private helper calls, physical D1 columns, or R2 key formatting.
 - Tests are written before implementation, then the minimum implementation is added to pass them, followed by refactoring while the tests remain green.
-- Bun tests cover the first six modules. Playwright covers the Score Presenter and Etude Web Interface in complete authenticated workflows.
-- Music Domain tests cover the exact supported keys, natural-minor spelling, scale-range boundaries, C7 exception, contiguous octave expansion, split eligibility, duration compatibility, malformed catalogs, and every catalog pattern's exact meter length.
-- Piece Generator tests use deterministic random sequences at branch boundaries. They cover every duration token, interval weights and normalization, over-12 exclusion, initial and later rests, consecutive-rest rules, first/subsequent bars, 20% repeat decisions, linear recency weighting, ineligible repeat fallback, exact-repeat exceptions, and the 25%/15%/60% two-hand outcomes.
+- Bun tests cover the first six modules plus the Score Presenter’s pure Piece-to-structured-text behavior. Playwright covers the Score Presenter’s page integration and the Etude Web Interface in complete authenticated workflows.
+- Music Domain tests cover the exact supported keys, natural-minor spelling, scale-range boundaries, C7 exception, contiguous octave expansion, one-hand and two-hand minimum pitch counts and exact validation message, split eligibility, duration compatibility, malformed catalogs, and every catalog pattern's exact meter length.
+- Piece Generator tests use deterministic random sequences at branch boundaries. They cover every duration token, interval weights and normalization, over-12 exclusion, initial and later rests, the left hand’s first pitched event in mirrored and independent rhythms, consecutive-rest rules, current-pitch continuity after fresh, repeated, and mirrored bars with trailing rests, first/subsequent bars, 20% repeat decisions, linear recency weighting, ineligible repeat fallback, exact-repeat exceptions, and the 25%/15%/60% two-hand outcomes.
 - Piece Generator property/invariant tests verify requested measure count, exact measure duration, selected pitches only, correct hand ranges, complete JSON serialization, empty unused-hand arrays, and no mutation of settings.
-- Repository tests cover one-record-per-user enforcement, cascade behavior, optimistic conflicts, conditional lock acquisition, one-minute lock recovery, independent cooldown clocks, success-only timestamps, owner-scoped reads, grant expiration, and single consumption.
-- Artifact Store tests use a fake R2 boundary and cover privacy, actual byte limits, missing objects, metadata mismatch, replacement, revocation, retry delays, and orphan reporting after exhausted cleanup.
+- Repository tests cover one-record-per-user enforcement, cascade behavior, optimistic conflicts, conditional lock acquisition, owner-identifier checks on every commit and release, replacement of an expired lock while its former owner is still running, unconditional owner-scoped release on every failure category, one-minute lock recovery, independent cooldown clocks, success-only timestamps, owner-scoped reads, grant expiration, and single consumption.
+- Artifact Store tests use a fake R2 boundary and cover privacy, actual byte limits, missing objects, metadata mismatch, replacement, revocation, retry delays, and the exact structured orphan-cleanup log event and fields after exhausted cleanup.
 - LilyPond Renderer contract tests cover exact request method, endpoints, authorization, JSON field, timeout, redirect handling, valid multipart responses, missing/duplicate parts, strict media types, actual size limits, bounded metadata/warnings, non-JSON and oversized errors, malformed SVG, sanitizer rejection, and safe SVG output.
-- Workflow Service tests cover every state transition and failure boundary, including stale-tab conflicts, upstream invalidation, stale-score hiding, new-Piece replacement, render retry identity, D1/R2 partial failures, generation and PDF locking, cooldown accounting, Start Over, account deletion, one-use PDF delivery, and opportunistic cleanup of expired grants on later owner activity.
-- Playwright tests cover signed-out denial; resume; all step routes; prerequisite redirects; defaults; Back links; read-only summaries; native labels/constraints; Select all with and without enhancement; duration prevention and server fallback; one-hand and two-hand flows; error summary focus; review; generation; stale-score hiding; retry rendering; score text alternative; SVG safety; PDF redirect/download/expiry/consumption; Start Over; concurrent/stale submissions; cooldown messages; and generic errors with correlation IDs.
+- Workflow Service tests cover every state transition and failure boundary, including stale-tab conflicts, upstream invalidation, stale-score hiding, new-Piece replacement, render retry identity, D1/R2 partial failures, generation and PDF locking, lost-lock-owner commit rejection, cooldown accounting, Start Over, account deletion, one-use PDF delivery, and opportunistic cleanup of expired grants on later owner activity.
+- Score Presenter Bun tests cover key and time signatures, ordered measures, both hands, empty unused hands, every pitch/rest and duration token, and stable accessible text derived only from the Piece.
+- Playwright tests cover signed-out denial; resume; all step routes; score access without a current Piece; prerequisite redirects; defaults; Back links; read-only summaries; native labels/constraints; Select all with and without enhancement; duration prevention and server fallback; one-hand and two-hand pitch cardinality; error summary focus; review; generation; score focus after generation and retry; stale-score hiding; retry rendering; score text alternative; SVG safety; exact PDF attachment filename, redirect, download, expiry, and consumption; Start Over; concurrent/stale submissions; cooldown messages; and generic errors with correlation IDs.
 - Existing protected-page sign-in tests and authentication helpers are prior art for authenticated navigation. Existing form-validation suites are prior art for server validation and error assertions. Existing resend/reset cooldown tests are prior art for time-based behavior. Existing database-failure hooks and retry tests are prior art for controlled persistence failures.
 - External service, D1, and R2 failures are simulated at module boundaries; tests do not depend on the real LilyPond service or public object URLs.
 - Distribution tests verify deterministic decision thresholds and invariants, not flaky aggregate randomness over uncontrolled production samples.

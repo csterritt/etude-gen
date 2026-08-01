@@ -1,5 +1,5 @@
 ---
-name: critique-a-prd
+name: critique-prd
 description: Critique a PRD. Use when the user wants to critique a PRD, before issue generation.
 ---
 

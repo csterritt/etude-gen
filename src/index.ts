@@ -39,6 +39,7 @@ import { buildProfile } from './routes/profile/build-profile'
 import { buildDeleteConfirm } from './routes/profile/build-delete-confirm'
 import { handleChangePassword } from './routes/profile/handle-change-password'
 import { handleDeleteAccount } from './routes/profile/handle-delete-account'
+import { buildHealth } from './routes/build-health'
 import { setupBetterAuth, setupBetterAuthMiddleware } from './routes/auth/better-auth-handler'
 import { setupBetterAuthResponseInterceptor } from './routes/auth/better-auth-response-interceptor'
 
@@ -208,6 +209,7 @@ buildProfile(app)
 buildDeleteConfirm(app)
 handleChangePassword(app)
 handleDeleteAccount(app)
+buildHealth(app)
 
 if (isTestRouteEnabledFlag) {
   handleSetClock(app) // PRODUCTION:REMOVE

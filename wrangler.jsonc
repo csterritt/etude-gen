@@ -37,10 +37,14 @@
 			"database_id": "8e70ad45-45e8-4504-8363-d0ee84d5f7d1",
 		},
 	],
+	/**
+	 * Private R2 bucket for etude score/PDF artifacts.
+	 * No public URL; the authenticated application reads through the binding only.
+	 */
 	"r2_buckets": [
 		{
 			"bucket_name": "etude-gen-storage",
-			"binding": "etude_gen_storage"
+			"binding": "ETUDE_GEN_STORAGE"
 		}
 	],
 	/**

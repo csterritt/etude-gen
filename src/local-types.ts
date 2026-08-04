@@ -19,6 +19,11 @@ export type SignInSession = {
 
 export interface Bindings {
   PROJECT_DB: D1Database
+  /**
+   * Private R2 bucket for etude score/PDF artifacts.
+   * No public URL; the authenticated application reads through the binding only.
+   */
+  ETUDE_GEN_STORAGE: R2Bucket
   Session: Maybe<SignInSession>
   db?: string
   signUpType?: string
@@ -39,6 +44,14 @@ export interface Bindings {
   SMTP_SERVER_USER?: string
   SMTP_SERVER_PASSWORD?: string
   ENABLE_TEST_ROUTES?: string
+  /** Base URL of the external LilyPond engraving service. */
+  LILYPOND_SERVICE_URL?: string
+  /** Bearer token used to authenticate LilyPond service requests. */
+  LILYPOND_API_KEY?: string
+  /** LilyPond request timeout in milliseconds; defaults to 30,000 when absent. */
+  LILYPOND_TIMEOUT_MS?: string
+  /** Operator token gating the privileged detailed health report. */
+  OPERATOR_TOKEN?: string
 }
 
 /**

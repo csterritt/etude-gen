@@ -23,6 +23,7 @@ export const HTML_STATUS = {
 export const PATHS = {
   ROOT: '/' as const,
   PRIVATE: '/private' as const,
+  HEALTH: '/health' as const,
 
   // Auth API paths
   AUTH: {

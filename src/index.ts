@@ -4,6 +4,7 @@
 
 import { env } from 'cloudflare:workers'
 import { Hono } from 'hono'
+import type { Context } from 'hono'
 import { logger } from 'hono/logger'
 import { csrf } from 'hono/csrf'
 import { secureHeaders } from 'hono/secure-headers'
@@ -40,10 +41,12 @@ import { buildDeleteConfirm } from './routes/profile/build-delete-confirm'
 import { handleChangePassword } from './routes/profile/handle-change-password'
 import { handleDeleteAccount } from './routes/profile/handle-delete-account'
 import { buildHealth } from './routes/build-health'
+import { handleUnexpectedError } from './routes/build-safe-error'
 import { setupBetterAuth, setupBetterAuthMiddleware } from './routes/auth/better-auth-handler'
 import { setupBetterAuthResponseInterceptor } from './routes/auth/better-auth-response-interceptor'
 
-import { Bindings } from './local-types'
+import { Bindings, type AppEnv } from './local-types'
+import { correlationIdMiddleware } from './middleware/correlation-id'
 import { validateEnvBindings } from './middleware/guard-sign-up-mode'
 import { handleSetClock } from './routes/auth/handle-set-clock' // PRODUCTION:REMOVE
 import { handleResetClock } from './routes/auth/handle-reset-clock' // PRODUCTION:REMOVE
@@ -51,6 +54,7 @@ import { handleSetDbFailures } from './routes/handle-set-db-failures' // PRODUCT
 import { testDatabaseRouter } from './routes/test/database' // PRODUCTION:REMOVE
 import { testSignUpModeRouter } from './routes/test/sign-up-mode' // PRODUCTION:REMOVE
 import { testSmtpRouter } from './routes/test/smtp-config' // PRODUCTION:REMOVE
+import { testForcedErrorRouter } from './routes/test/forced-error' // PRODUCTION:REMOVE
 import { isTestRouteEnabled } from './lib/test-routes'
 
 /**
@@ -117,6 +121,9 @@ if (env.ALTERNATE_ORIGIN) {
 } // PRODUCTION:REMOVE
 
 // Apply middleware
+// Correlation identifier must be first so every response (including errors)
+// carries the X-Correlation-ID header and downstream handlers can read it.
+app.use(correlationIdMiddleware)
 app.use(secureHeaders({ referrerPolicy: 'strict-origin-when-cross-origin' }))
 // Apply CSRF protection to all routes except test endpoints
 app.use(async (c, next) => {
@@ -220,10 +227,15 @@ if (isTestRouteEnabledFlag) {
   app.route('/test/database', testDatabaseRouter) // PRODUCTION:REMOVE
   app.route('/test/sign-up-mode', testSignUpModeRouter) // PRODUCTION:REMOVE
   app.route('/test', testSmtpRouter) // PRODUCTION:REMOVE
+  app.route('/test', testForcedErrorRouter) // PRODUCTION:REMOVE
 }
 
 // this MUST be the last route declared!
 build404(app)
+
+// Global unexpected-error handler: logs with the correlation identifier and
+// renders the safe error page. Wired after all routes and the 404 handler.
+app.onError((err, c) => handleUnexpectedError(c as unknown as Context<AppEnv>, err))
 showRoutes(app) // PRODUCTION:REMOVE
 
 export default app

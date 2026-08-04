@@ -103,6 +103,8 @@ export interface AppVariables {
   session?: AuthSession | null
   authSession?: AuthSessionResponse | null
   signInEmail?: string
+  /** Request correlation identifier, set by the correlation-id middleware. */
+  correlationId?: string
 }
 
 /**

@@ -21,3 +21,13 @@ The etude feature requires additional configuration beyond the existing auth and
 - `LILYPOND_SERVICE_URL` and `LILYPOND_API_KEY` secrets for the external engraving service.
 - `LILYPOND_TIMEOUT_MS` variable (defaults to 30,000 ms).
 - A health route (`/health`) that validates all required configuration before the application is considered healthy, split into an anonymous liveness surface and a privileged detailed operator report.
+
+## Correlation, logging, and safe errors
+
+Every request carries an application-generated UUID v4 correlation identifier:
+
+- The correlation-id middleware (`src/middleware/correlation-id.ts`) generates the identifier, stores it on the Hono context, and sets it on the `X-Correlation-ID` response header. It is wired globally as the first middleware so every response — including error responses — carries the header.
+- The structured logger (`src/lib/logger.ts`) redacts sensitive fields (names, email, session values, Bearer tokens, secrets, service credentials, LilyPond request bodies) and passes the `correlationId` through verbatim. Routine successful operations are not logged; only failures, refusals, and cleanup outcomes are.
+- The correlation context (`src/lib/correlation-context.ts`) threads the identifier into Workflow Service, renderer, repository, and artifact-store calls, and into deferred cleanup. Deferred work with no remaining request context generates its own operation identifier labelled as such, so an operation-originated line is distinguishable from a request-originated one.
+- Refusals (`src/lib/refusal-logger.ts`) — lost-lock, stale-operation, stale-epoch, stale-Piece — are logged with a typed category and no user identifier, Piece content, LilyPond source, grant identifier, or credential.
+- Unexpected errors are handled by `app.onError` (`src/routes/build-safe-error.tsx`), which logs the error with the correlation identifier and renders a generic safe message plus the visible identifier — no stack trace, SQL, or service detail.

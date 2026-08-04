@@ -5,6 +5,10 @@ CLOUDFLARE_ACCOUNT_ID='<your account id>'
 CLOUDFLARE_DATABASE_ID='<your d1 database id>'
 CLOUDFLARE_D1_TOKEN='<your d1 token>'
 
+LILYPOND_SERVICE_URL='<your lilypond service url>'
+LILYPOND_API_KEY='<your lilypond api key>'
+LILYPOND_TIMEOUT_MS='<your lilypond timeout ms>'
+
 PO_APP_ID='<your pushover app id - optional>'
 PO_USER_ID='<your pushover user id - optional>'
 

@@ -4,7 +4,7 @@ import { verifyAlert } from '../support/finders'
 import {
   verifyOnSignInPage,
   verifyOnSignUpPage,
-  verifyOnProtectedPage,
+  verifyOnEtudePage,
   verifyOnAwaitVerificationPage,
 } from '../support/page-verifiers'
 import { testWithDatabase } from '../support/test-helpers'
@@ -87,7 +87,7 @@ test(
     await submitSignInForm(page, { email: newEmail, password: newPassword })
 
     // Should be successfully signed in and redirected to protected page
-    await verifyOnProtectedPage(page)
+    await verifyOnEtudePage(page)
     await verifyAlert(page, 'Welcome! You have been signed in successfully.')
   }),
 )

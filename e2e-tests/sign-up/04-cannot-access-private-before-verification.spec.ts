@@ -34,8 +34,8 @@ test(
     // Should be redirected to await verification page
     await verifyOnAwaitVerificationPage(page)
 
-    // Now try to directly access the private page without being signed in
-    await page.goto(BASE_URLS.PRIVATE)
+    // Now try to directly access the etude page without being signed in
+    await page.goto(BASE_URLS.ETUDE)
 
     // Should be redirected back to sign-in page with access denied message
     await verifyOnSignInPage(page)
@@ -52,8 +52,8 @@ test(
       'Please verify your email address before signing in. Check your email for a verification link.',
     )
 
-    // Try to access private page again after failed sign-in attempt
-    await page.goto(BASE_URLS.PRIVATE)
+    // Try to access etude page again after failed sign-in attempt
+    await page.goto(BASE_URLS.ETUDE)
 
     // Should still be redirected back to sign-in page with access denied message
     await verifyOnSignInPage(page)

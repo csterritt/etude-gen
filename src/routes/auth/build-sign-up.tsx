@@ -121,7 +121,7 @@ export const buildSignUp = (app: Hono<{ Bindings: Bindings }>): void => {
     const user = c.get('user')
     if (user) {
       console.log('Already signed in')
-      return redirectWithMessage(c, PATHS.PRIVATE, MESSAGES.ALREADY_SIGNED_IN)
+      return redirectWithMessage(c, PATHS.ETUDE, MESSAGES.ALREADY_SIGNED_IN)
     }
 
     const emailEntered: string = retrieveCookie(c, COOKIES.EMAIL_ENTERED) ?? ''

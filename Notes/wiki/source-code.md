@@ -32,6 +32,10 @@ Generates a UUID v4 per request, stores it on the Hono context (`correlationId`)
 
 ## routes/
 
+### build-etude.tsx
+
+The authenticated etude entry route (`GET /etude`), registered in `src/index.ts` with `secureHeaders(STANDARD_SECURE_HEADERS)` and the `signedInAccess` middleware. A signed-out visitor is redirected to sign-in with the explanatory "You must sign in to visit that page" message (handled by `signedInAccess`); a signed-in student sees a placeholder heading (`data-testid="etude-page-banner"`) with no-cache headers. This route replaces the former `/private` placeholder — `/private` is unregistered and falls through to the standard 404 handler. Exports `buildEtude`.
+
 ### build-health.tsx
 
 The health route for the etude feature, split into two surfaces sharing one validation pass:

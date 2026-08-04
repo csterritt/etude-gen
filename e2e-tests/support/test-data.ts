@@ -118,7 +118,7 @@ export const BASE_URLS = {
   INTEREST_SIGN_UP: `${SERVER_BASE_URL}/auth/interest-sign-up`,
   FORGOT_PASSWORD: `${SERVER_BASE_URL}/auth/forgot-password`,
   AWAIT_VERIFICATION: `${SERVER_BASE_URL}/auth/await-verification`,
-  PRIVATE: `${SERVER_BASE_URL}/private`,
+  ETUDE: `${SERVER_BASE_URL}/etude`,
   WAITING_FOR_RESET: `${SERVER_BASE_URL}/auth/waiting-for-reset`,
   SIGN_OUT: `${SERVER_BASE_URL}/auth/sign-out`,
   PROFILE: `${SERVER_BASE_URL}/profile`,

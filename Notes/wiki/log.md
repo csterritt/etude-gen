@@ -48,3 +48,35 @@ New test files:
 - `e2e-tests/general/06-correlation-id-and-safe-error.spec.ts` — 2 Playwright tests for the header and forced-error safe page.
 
 Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md` (new), `project-overview.md`, `index.md`.
+
+## [2026-08-04] ingest | issue-003 etude entry route replaces private
+
+Ingested the `/etude` authenticated entry route and `/private` removal (issue #3).
+
+New source files:
+- `src/routes/build-etude.tsx` — authenticated etude entry route (`GET /etude`) with `signedInAccess` middleware, secure headers, and no-cache behavior; placeholder heading with `etude-page-banner` testid.
+
+Deleted source files:
+- `src/routes/build-private.tsx` — removed entirely; `/private` is unregistered and falls through to the standard 404 handler.
+
+Modified source files:
+- `src/constants.ts` — removed `PATHS.PRIVATE`, added `PATHS.ETUDE`.
+- `src/index.ts` — removed `buildPrivate` import/call, added `buildEtude` import/call.
+- `src/lib/auth.ts` — `redirectTo` changed from `/private` to `/etude`.
+- `src/routes/auth/better-auth-response-interceptor.ts` — `handleVerifiedSignIn` redirects to `PATHS.ETUDE`.
+- `src/routes/auth/build-sign-in.tsx`, `build-sign-up.tsx`, `build-gated-sign-up.tsx`, `build-interest-sign-up.tsx`, `build-gated-interest-sign-up.tsx`, `handle-interest-sign-up.ts`, `handle-gated-interest-sign-up.ts` — already-signed-in redirects repointed from `PATHS.PRIVATE` to `PATHS.ETUDE`.
+- `src/routes/profile/build-profile.tsx` — `go-back-action` link href changed to `PATHS.ETUDE`.
+- `src/routes/build-root.tsx` — protected-content link href changed to `PATHS.ETUDE`, testid renamed from `visit-private-action` to `visit-etude-action`.
+
+New test files:
+- `e2e-tests/etude/01-etude-protected-route.spec.ts` — 2 tests for signed-out denial and signed-in access with no-cache headers.
+- `e2e-tests/etude/02-etude-destinations-and-private-removal.spec.ts` — 4 tests for sign-in destination, profile link, root link, and `/private` 404.
+
+Modified test files:
+- `e2e-tests/support/test-data.ts` — `BASE_URLS.PRIVATE` → `BASE_URLS.ETUDE`.
+- `e2e-tests/support/page-verifiers.ts` — `verifyOnProtectedPage` → `verifyOnEtudePage` (checks `etude-page-banner`).
+- `e2e-tests/support/navigation-helpers.ts` — `navigateToPrivatePage` → `navigateToEtudePage`.
+- `e2e-tests/support/auth-helpers.ts`, `workflow-helpers.ts` — updated to `verifyOnEtudePage`.
+- 10 existing spec files updated from `/private` references to `/etude` equivalents.
+
+Wiki pages updated: `source-code.md`, `e2e-tests.md`, `project-overview.md`.

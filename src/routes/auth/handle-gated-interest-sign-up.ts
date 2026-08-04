@@ -49,7 +49,7 @@ export const handleGatedInterestSignUp = (app: Hono<{ Bindings: Bindings }>): vo
     // Check if user is already signed in
     const user = c.get('user')
     if (user) {
-      return redirectWithMessage(c, PATHS.PRIVATE, MESSAGES.ALREADY_SIGNED_IN)
+      return redirectWithMessage(c, PATHS.ETUDE, MESSAGES.ALREADY_SIGNED_IN)
     }
 
     // Get form data and validate

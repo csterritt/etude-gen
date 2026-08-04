@@ -4,7 +4,7 @@ import { clickLink, verifyElementExists } from '../support/finders'
 import {
   verifyOnProfilePage,
   verifyOnDeleteConfirmPage,
-  verifyOnProtectedPage,
+  verifyOnEtudePage,
   verifyOnSignInPage,
 } from '../support/page-verifiers'
 import { navigateToProfile } from '../support/navigation-helpers'
@@ -67,7 +67,7 @@ test(
     await submitSignInForm(page, TEST_USERS.KNOWN_USER)
 
     // Should be successfully signed in
-    await verifyOnProtectedPage(page)
+    await verifyOnEtudePage(page)
   }),
 )
 

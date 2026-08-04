@@ -57,7 +57,7 @@ const handleUnverifiedSignUp = (
  * Handle successful sign-in with verified email
  */
 const handleVerifiedSignIn = (c: InterceptorContext, response: Response): Response => {
-  const redirectResponse = redirectWithMessage(c, PATHS.PRIVATE, ERROR_MESSAGES.WELCOME)
+  const redirectResponse = redirectWithMessage(c, PATHS.ETUDE, ERROR_MESSAGES.WELCOME)
 
   const allCookieHeaders = response.headers.getSetCookie?.() || []
   allCookieHeaders.forEach((cookie) => {

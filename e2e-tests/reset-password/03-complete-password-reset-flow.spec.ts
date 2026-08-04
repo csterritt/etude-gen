@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test'
 import { clickLink, verifyAlert, isElementVisible } from '../support/finders'
 import {
   verifyOnSignInPage,
-  verifyOnProtectedPage,
+  verifyOnEtudePage,
   verifyOnWaitingForResetPage,
   verifyOnResetPasswordPage,
 } from '../support/page-verifiers'
@@ -108,7 +108,7 @@ test(
     await submitSignInForm(page, { email, password: newPassword })
 
     // Should be successfully signed in and redirected to protected page
-    await verifyOnProtectedPage(page)
+    await verifyOnEtudePage(page)
     await verifyAlert(page, ERROR_MESSAGES.SIGN_IN_SUCCESS)
 
     // Verify that the old password no longer works by signing out and trying

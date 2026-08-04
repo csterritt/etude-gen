@@ -131,7 +131,7 @@ export const buildSignIn = (app: Hono<{ Bindings: Bindings }>): void => {
       const user = c.get('user')
       if (user) {
         console.log('Already signed in')
-        return redirectWithMessage(c, PATHS.PRIVATE, MESSAGES.ALREADY_SIGNED_IN)
+        return redirectWithMessage(c, PATHS.ETUDE, MESSAGES.ALREADY_SIGNED_IN)
       }
 
       // Validate optional path flag :validationSuccessful

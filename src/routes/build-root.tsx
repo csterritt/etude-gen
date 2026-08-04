@@ -25,7 +25,7 @@ const renderRoot = () => {
             Worker, D1, Drizzle Project
           </h3>
           <div className='card-actions'>
-            <a href={PATHS.PRIVATE} className='btn btn-primary' data-testid='visit-private-action'>
+            <a href={PATHS.ETUDE} className='btn btn-primary' data-testid='visit-etude-action'>
               Protected Content
             </a>
           </div>

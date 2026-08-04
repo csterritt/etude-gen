@@ -5,7 +5,7 @@ import {
   verifyOnSignInPage,
   verifyOnSignUpPage,
   verifyOnProfilePage,
-  verifyOnProtectedPage,
+  verifyOnEtudePage,
   verifyOnAwaitVerificationPage,
   verifyOnForgotPasswordPage,
   verifyOnWaitingForResetPage,
@@ -68,9 +68,9 @@ export const navigateToWaitingForReset = async (page: Page) => {
   await verifyOnWaitingForResetPage(page)
 }
 
-export const navigateToPrivatePage = async (page: Page) => {
-  await page.goto(BASE_URLS.PRIVATE)
-  await verifyOnProtectedPage(page)
+export const navigateToEtudePage = async (page: Page) => {
+  await page.goto(BASE_URLS.ETUDE)
+  await verifyOnEtudePage(page)
 }
 
 export const navigateToProfile = async (page: Page) => {

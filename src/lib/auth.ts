@@ -102,7 +102,7 @@ export const createAuth = (env: Bindings) => {
     ],
     // baseURL: 'https://mini-auth.example.com, // PRODUCTION:UNCOMMENT
     baseURL: 'http://localhost:3000', // PRODUCTION:REMOVE
-    redirectTo: '/private', // Redirect to protected page after successful sign-in
+    redirectTo: '/etude', // Redirect to etude entry after successful sign-in
     secret: env.BETTER_AUTH_SECRET,
   })
 }

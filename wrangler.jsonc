@@ -25,6 +25,9 @@
 		"Session": "",
 		"db": "",
 		"signUpType": "",
+		"LILYPOND_SERVICE_URL": "",
+		"LILYPOND_API_KEY": "",
+		"LILYPOND_TIMEOUT_MS": ""
 	},
 	"d1_databases": [
 		{
@@ -33,6 +36,12 @@
 			"database_name": "etude-gen-db",
 			"database_id": "8e70ad45-45e8-4504-8363-d0ee84d5f7d1",
 		},
+	],
+	"r2_buckets": [
+		{
+			"bucket_name": "etude-gen-storage",
+			"binding": "etude_gen_storage"
+		}
 	],
 	/**
    * Smart Placement

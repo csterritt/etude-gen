@@ -13,6 +13,7 @@
  * @module routes/build-safe-error
  */
 import type { Context } from 'hono'
+import { HTTPException } from 'hono/http-exception'
 
 import { CORRELATION_ID_HEADER } from '../middleware/correlation-id'
 import { logError } from '../lib/logger'
@@ -68,6 +69,16 @@ export const handleUnexpectedError = (
   err: unknown,
 ): Response | Promise<Response> => {
   const correlationId = c.get('correlationId') ?? 'no-correlation-id'
+
+  // HTTPException carries an intentional HTTP response (e.g. CSRF's 403).
+  // Preserve its status and body instead of masking it as a 500. This
+  // restores Hono's default error-handler behavior, which the custom
+  // onError handler would otherwise override.
+  if (err instanceof HTTPException) {
+    const res = err.getResponse()
+    c.header(CORRELATION_ID_HEADER, correlationId)
+    return c.newResponse(res.body, res)
+  }
 
   // Log only safe fields. The error message is intentionally excluded because
   // it may contain PII, SQL, stack traces, or service detail; the redacting

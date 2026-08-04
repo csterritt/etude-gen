@@ -5,6 +5,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import { Hono } from 'hono'
+import { HTTPException } from 'hono/http-exception'
 
 import { correlationIdMiddleware, CORRELATION_ID_HEADER } from '../src/middleware/correlation-id'
 import { handleUnexpectedError, SAFE_ERROR_TESTID } from '../src/routes/build-safe-error'
@@ -88,6 +89,31 @@ describe('safe error page and global error handler', () => {
     const header = res.headers.get(CORRELATION_ID_HEADER) as string
     const body = await res.text()
     expect(body).toContain(header)
+  })
+
+  it('should preserve the status code and body of an HTTPException instead of converting it to 500', async () => {
+    const app = new Hono<AppEnv>()
+    app.use(correlationIdMiddleware)
+    app.post('/forbidden', () => {
+      throw new HTTPException(403, { res: new Response('Forbidden', { status: 403 }) })
+    })
+    app.onError((err, c) => handleUnexpectedError(c, err))
+
+    const res = await app.request('/forbidden', { method: 'POST' })
+    expect(res.status).toBe(403)
+    expect(await res.text()).toBe('Forbidden')
+  })
+
+  it('should preserve the status code of an HTTPException that has no explicit response', async () => {
+    const app = new Hono<AppEnv>()
+    app.use(correlationIdMiddleware)
+    app.post('/teapot', () => {
+      throw new HTTPException(418, { message: "I'm a teapot" })
+    })
+    app.onError((err, c) => handleUnexpectedError(c, err))
+
+    const res = await app.request('/teapot', { method: 'POST' })
+    expect(res.status).toBe(418)
   })
 
   it('should log the error with the correlation identifier and no PII or secret values', async () => {

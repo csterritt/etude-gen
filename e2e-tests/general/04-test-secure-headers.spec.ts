@@ -31,8 +31,8 @@ test.describe('Security Headers', () => {
       // Sign in with known email and password
       await signInUser(page, TEST_USERS.KNOWN_USER.email, TEST_USERS.KNOWN_USER.password)
 
-      // Try to POST to the increment endpoint with an invalid Origin header
-      const invalidOriginResponse = await request.post('http://localhost:3000/increment', {
+      // Try to POST to the profile endpoint with an invalid Origin header
+      const invalidOriginResponse = await request.post('http://localhost:3000/profile', {
         headers: {
           Origin: 'https://malicious-site.com', // Invalid origin
         },
@@ -43,7 +43,7 @@ test.describe('Security Headers', () => {
       expect(invalidOriginResponse.status()).toBe(403)
 
       // Try to POST without any Origin header
-      const noOriginResponse = await request.post('http://localhost:3000/increment', {
+      const noOriginResponse = await request.post('http://localhost:3000/profile', {
         headers: {
           // No Origin header
         },
@@ -54,7 +54,7 @@ test.describe('Security Headers', () => {
       expect(noOriginResponse.status()).toBe(403)
 
       // Try with a valid Origin to confirm the CSRF protection is working correctly
-      const validOriginResponse = await request.post('http://localhost:3000/increment', {
+      const validOriginResponse = await request.post('http://localhost:3000/profile', {
         headers: {
           Origin: 'http://localhost:3000', // Valid origin
         },

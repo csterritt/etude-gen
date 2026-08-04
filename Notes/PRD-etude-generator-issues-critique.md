@@ -130,48 +130,48 @@ Traceability is nevertheless fragile because issue references are only story num
 
 ## Issue-by-issue disposition
 
-| Issue | Disposition | Principal critique |
-|---|---|---|
-| 1 | Minor revision | Good configuration boundary; clarify health endpoint exposure and deployment acceptance of current LilyPond version. Catalog health is correctly delegated to Issue 12. |
-| 2 | Minor revision | Strong safe-error contract; define correlation propagation into Workflow Service, renderer, artifact cleanup, and deferred work rather than only request/response handling. |
-| 3 | Minor revision | Authentication and navigation are clear; specify the intended `/private` result (404, redirect, or removal) so tests do not encode an arbitrary behavior. |
-| 4 | Minor revision | Add an atomic concurrent load-or-create test and explicitly require the database uniqueness constraint already implied by the PRD. |
-| 5 | Revision | Setup behavior is testable, but later cross-cutting form dependencies do not inherit its validation/PRG contract. Empty/multi-value form submissions should be covered. |
-| 6 | Accept with minor clarification | Exact key set and spelling tests are strong; explicitly connect key changes to Issue 11 invalidation. |
-| 7 | Accept with minor clarification | Range/C7 behavior is well covered; include exact-boundary C7 cases and multi-value/unordered form input. |
-| 8 | Revision | Define validation-state integrity, confidentiality as needed, bounds, encoding, expiry, and cookie-overflow fallback. |
-| 9 | Revision | Make this a prerequisite/shared contract for every later form, not just setup. Specify unique IDs and behavior for repeated field errors. |
-| 10 | Revision | Apply CAS requirements explicitly to all later state-changing parameter forms and define the concurrency token for non-parameter operations. |
-| 11 | Minor revision | Atomic invalidation is correct; add simultaneous multi-field changes and stale-CAS interaction tests. |
-| 12 | Minor revision | Strong catalog validation; define token numeric durations in the issue and decide whether duplicate patterns are rejected or deliberately allowed. |
-| 13 | Revision | Depend on Issues 8-10; define “first derived” after every upstream invalidation and distinguish no-script Select all from ordinary save. |
-| 14 | Revision | Depend on Issues 8-10; define stable corrective error text/semantics and behavior for duplicate/unknown duration values. |
-| 15 | Minor revision / HITL | Correctly isolated client enhancement; specify accessible disabled-state explanation and initialization behavior. |
-| 16 | Major dependency revision | Must depend on Issue 14 and shared form contracts. Define redirect target and corrupt-state recovery when fewer than two pitches are stored. |
-| 17 | Minor revision | Shared summaries are sound; enumerate required summary fields per step and depend on the complete notes step. |
-| 18 | Revision | Define the full state-to-canonical-route table, including current rendered Piece, render-failure Piece, and stale Piece states. |
-| 19 | Major revision | Do not persist review completion on GET. Resolve Generate-control scope instead of allowing “inert or hidden” alternatives. |
-| 20 | Major sequencing revision | Minimal Piece tracer bullet is useful for tests, but externally reachable generation must not precede locking/recovery/coherence. Define failure redirect and exact contract ownership. |
-| 21 | Minor revision | Good presenter/accessibility split; define behavior for missing/corrupt Piece and make retry-state ownership explicit. |
-| 22 | Minor revision | Deterministic sampling plan is strong; include exact weights locally or a normative PRD reference and define RNG range/invalid outputs. |
-| 23 | Accept with minor clarification | Rest boundaries are well covered; define “fresh” precisely relative to repeat/mirror exceptions. |
-| 24 | Revision | Resolve all-rest/no-current-pitch repeat eligibility and explicitly state left-hand independent repetition is handled only by Issue 25. |
-| 25 | Revision | Define prior-left-bar source selection and fallback; current percentages alone do not specify the algorithm. |
-| 26 | Minor revision | Good pure boundary; define invariant validation responsibility so malformed stored Piece behavior is deterministic. |
-| 27 | Revision | Tight contract overall; harden redirect/origin rules and state where SVG metadata is persisted. |
-| 28 | Revision | Define the sanitizer allowlist and concrete embed-time defense rather than relying on DOMPurify defaults. |
-| 29 | Revision | Define semantic object metadata and byte limits; clarify whether retries delay the response or run in an execution context. |
-| 30 | Major sequencing revision | Happy path is clear but must not be externally enabled before Issues 31, 33, 34, and 40. Define exact accessible SVG/text relationship. |
-| 31 | Revision | Add stale-Piece rejection before retry and owner/version checks before every side effect and commit. |
-| 32 | Revision | Clarify stale retry behavior and changing parameters back to identical Piece-producing values; direct stale score/PDF actions must be rejected. |
-| 33 | Major revision | Add the distinct PDF lock and independent-lock tests; test crash before work and lock loss during every stage. |
-| 34 | Minor revision | Good success-only cooldown; test replacement generation during the same per-user cooldown and exact boundary clock semantics. |
-| 35 | Major revision | Specify PDF lock, owner/current/non-stale Piece checks, complete service error mapping, and explicit deferral/dependency on grant lifecycle. |
-| 36 | Revision | Define consumption/read/response/cleanup order and failure behavior; require authentication explicitly. |
-| 37 | Minor revision | State cooldown is per user, not per Piece, and test Piece replacement during the cooldown. |
-| 38 | Major dependency/concurrency revision | Depend on completed lock/cooldown/grant issues and define behavior against already in-flight owners and workflow version reset/new epoch. |
-| 39 | Major concurrency/order revision | Capture artifact IDs before cascade, prevent post-deletion commits, and test deletion during in-flight generation/PDF work. |
-| 40 | Major dependency revision | Depend on every operation/failure mechanism it validates; add orphan cleanup requirements after R2 success followed by failed D1 commit. |
+| Issue | Disposition                           | Principal critique                                                                                                                                                                      |
+| ----- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | Minor revision                        | Good configuration boundary; clarify health endpoint exposure and deployment acceptance of current LilyPond version. Catalog health is correctly delegated to Issue 12.                 |
+| 2     | Minor revision                        | Strong safe-error contract; define correlation propagation into Workflow Service, renderer, artifact cleanup, and deferred work rather than only request/response handling.             |
+| 3     | Minor revision                        | Authentication and navigation are clear; specify the intended `/private` result (404, redirect, or removal) so tests do not encode an arbitrary behavior.                               |
+| 4     | Minor revision                        | Add an atomic concurrent load-or-create test and explicitly require the database uniqueness constraint already implied by the PRD.                                                      |
+| 5     | Revision                              | Setup behavior is testable, but later cross-cutting form dependencies do not inherit its validation/PRG contract. Empty/multi-value form submissions should be covered.                 |
+| 6     | Accept with minor clarification       | Exact key set and spelling tests are strong; explicitly connect key changes to Issue 11 invalidation.                                                                                   |
+| 7     | Accept with minor clarification       | Range/C7 behavior is well covered; include exact-boundary C7 cases and multi-value/unordered form input.                                                                                |
+| 8     | Revision                              | Define validation-state integrity, confidentiality as needed, bounds, encoding, expiry, and cookie-overflow fallback.                                                                   |
+| 9     | Revision                              | Make this a prerequisite/shared contract for every later form, not just setup. Specify unique IDs and behavior for repeated field errors.                                               |
+| 10    | Revision                              | Apply CAS requirements explicitly to all later state-changing parameter forms and define the concurrency token for non-parameter operations.                                            |
+| 11    | Minor revision                        | Atomic invalidation is correct; add simultaneous multi-field changes and stale-CAS interaction tests.                                                                                   |
+| 12    | Minor revision                        | Strong catalog validation; define token numeric durations in the issue and decide whether duplicate patterns are rejected or deliberately allowed.                                      |
+| 13    | Revision                              | Depend on Issues 8-10; define “first derived” after every upstream invalidation and distinguish no-script Select all from ordinary save.                                                |
+| 14    | Revision                              | Depend on Issues 8-10; define stable corrective error text/semantics and behavior for duplicate/unknown duration values.                                                                |
+| 15    | Minor revision / HITL                 | Correctly isolated client enhancement; specify accessible disabled-state explanation and initialization behavior.                                                                       |
+| 16    | Major dependency revision             | Must depend on Issue 14 and shared form contracts. Define redirect target and corrupt-state recovery when fewer than two pitches are stored.                                            |
+| 17    | Minor revision                        | Shared summaries are sound; enumerate required summary fields per step and depend on the complete notes step.                                                                           |
+| 18    | Revision                              | Define the full state-to-canonical-route table, including current rendered Piece, render-failure Piece, and stale Piece states.                                                         |
+| 19    | Major revision                        | Do not persist review completion on GET. Resolve Generate-control scope instead of allowing “inert or hidden” alternatives.                                                             |
+| 20    | Major sequencing revision             | Minimal Piece tracer bullet is useful for tests, but externally reachable generation must not precede locking/recovery/coherence. Define failure redirect and exact contract ownership. |
+| 21    | Minor revision                        | Good presenter/accessibility split; define behavior for missing/corrupt Piece and make retry-state ownership explicit.                                                                  |
+| 22    | Minor revision                        | Deterministic sampling plan is strong; include exact weights locally or a normative PRD reference and define RNG range/invalid outputs.                                                 |
+| 23    | Accept with minor clarification       | Rest boundaries are well covered; define “fresh” precisely relative to repeat/mirror exceptions.                                                                                        |
+| 24    | Revision                              | Resolve all-rest/no-current-pitch repeat eligibility and explicitly state left-hand independent repetition is handled only by Issue 25.                                                 |
+| 25    | Revision                              | Define prior-left-bar source selection and fallback; current percentages alone do not specify the algorithm.                                                                            |
+| 26    | Minor revision                        | Good pure boundary; define invariant validation responsibility so malformed stored Piece behavior is deterministic.                                                                     |
+| 27    | Revision                              | Tight contract overall; harden redirect/origin rules and state where SVG metadata is persisted.                                                                                         |
+| 28    | Revision                              | Define the sanitizer allowlist and concrete embed-time defense rather than relying on DOMPurify defaults.                                                                               |
+| 29    | Revision                              | Define semantic object metadata and byte limits; clarify whether retries delay the response or run in an execution context.                                                             |
+| 30    | Major sequencing revision             | Happy path is clear but must not be externally enabled before Issues 31, 33, 34, and 40. Define exact accessible SVG/text relationship.                                                 |
+| 31    | Revision                              | Add stale-Piece rejection before retry and owner/version checks before every side effect and commit.                                                                                    |
+| 32    | Revision                              | Clarify stale retry behavior and changing parameters back to identical Piece-producing values; direct stale score/PDF actions must be rejected.                                         |
+| 33    | Major revision                        | Add the distinct PDF lock and independent-lock tests; test crash before work and lock loss during every stage.                                                                          |
+| 34    | Minor revision                        | Good success-only cooldown; test replacement generation during the same per-user cooldown and exact boundary clock semantics.                                                           |
+| 35    | Major revision                        | Specify PDF lock, owner/current/non-stale Piece checks, complete service error mapping, and explicit deferral/dependency on grant lifecycle.                                            |
+| 36    | Revision                              | Define consumption/read/response/cleanup order and failure behavior; require authentication explicitly.                                                                                 |
+| 37    | Minor revision                        | State cooldown is per user, not per Piece, and test Piece replacement during the cooldown.                                                                                              |
+| 38    | Major dependency/concurrency revision | Depend on completed lock/cooldown/grant issues and define behavior against already in-flight owners and workflow version reset/new epoch.                                               |
+| 39    | Major concurrency/order revision      | Capture artifact IDs before cascade, prevent post-deletion commits, and test deletion during in-flight generation/PDF work.                                                             |
+| 40    | Major dependency revision             | Depend on every operation/failure mechanism it validates; add orphan cleanup requirements after R2 success followed by failed D1 commit.                                                |
 
 ## Acceptance-criteria quality
 

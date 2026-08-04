@@ -17,8 +17,8 @@ Finally, a line with a "// PRODUCTION:STOP" comment directs the cleanup program 
 export const foo = () => {
 // } // PRODUCTION:UNCOMMENT
 // PRODUCTION:STOP
-   allowAnyoneToSignInWithAnyPassword()
-   //...etc...
+allowAnyoneToSignInWithAnyPassword()
+//...etc...
 }
 
 The typical thing is to have, as above, a "PRODUCTION:UNCOMMENT" line or lines that make whatever code is being defined syntactically correct, so the file can be imported and the function 'foo' called with no bad effects, but it will not do anything.

@@ -1,6 +1,6 @@
 ---
 name: running-the-server
-description: Since this is a web development project, here are rules for running the server and running tests in this project. 
+description: Since this is a web development project, here are rules for running the server and running tests in this project.
 ---
 
 ## server and test running
@@ -20,6 +20,7 @@ description: Since this is a web development project, here are rules for running
 - when writing tests, make sure to look in the @e2e-tests/support folder for test helpers
   external references. If no input is provided, ask the user to share a
   file or diff before proceeding.
+
 ---
 
 ## server and test running

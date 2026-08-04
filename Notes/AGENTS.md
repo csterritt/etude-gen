@@ -2,6 +2,7 @@
 name: Notes/AGENTS.md
 description: As an agent, how to navigate the project.
 ---
+
 ## Notes
 
 This is where project documentation and notes live.

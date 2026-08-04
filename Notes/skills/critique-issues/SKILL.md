@@ -15,7 +15,7 @@ Ask the user for the PRD to examine, and where the issues are located, and any i
 
 Also ask for the file format and location where the issues critique should be saved.
 
-Read through the PRD and issues and any relevant input files for: 
+Read through the PRD and issues and any relevant input files for:
 
 - Missing elements
 - Incomplete elements

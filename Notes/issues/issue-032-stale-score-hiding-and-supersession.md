@@ -13,6 +13,42 @@ Ensure revised settings are never shown beside stale music. Changing a parameter
 
 Covers the PRD decisions on stale Pieces and supersession, and connects the invalidation from Issue 11 to the score and PDF surfaces.
 
+### Cross-cutting contract
+
+`Notes/issues/etude-cross-cutting-contract.md` applies:
+
+- Section 1 — authentication, no-cache, owner scoping, safe messages.
+- Section 3 — every operation POST re-verifies current non-stale Piece identity before
+  external work and again at commit.
+- Section 5 — a stale Piece's canonical route is the earliest incomplete step, or review
+  when every step is confirmed, and never the score.
+
+### Definition of stale
+
+A Piece is stale exactly when its `sourceParameterVersion` is not equal to the aggregate's
+current `workflowVersion`. Staleness is derived from that comparison on every read; it is
+not a separate stored flag that could drift.
+
+Consequently, **changing a parameter back to its original value does not un-stale a Piece**.
+The workflow version increments on every committed parameter change, so a round trip from
+C major to G major and back leaves the version higher than the Piece's
+`sourceParameterVersion`, and the Piece stays stale even though it would now be regenerated
+from identical settings. This is deliberate: version comparison is cheap and unambiguous,
+whereas comparing settings for semantic equality would have to define equality across every
+field and would silently un-hide music the student was told was gone. The student regenerates.
+
+### Direct actions against a stale Piece
+
+Hiding a control is presentation, not enforcement. Every route must refuse independently:
+
+| Request                                                                 | Behaviour with a stale current Piece                                                                            |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `GET /etude/score`                                                      | 303 to the canonical route for the current state with a safe message; no score, no SVG bytes read               |
+| `POST /etude/render/retry`                                              | Refused before any LilyPond call, per Issue 31; no cooldown consumed                                            |
+| `POST /etude/pdf`                                                       | Refused before any LilyPond call; no PDF lock acquired, nothing stored, no grant created                        |
+| `GET /etude/pdf/download/:grantId` for a grant whose Piece is now stale | The grant is revoked, no bytes are served, and the owner is redirected to the canonical route with a safe error |
+| `POST /etude/generate`                                                  | Permitted; this is the replacement path                                                                         |
+
 ### How to verify
 
 - **Manual**: generate a score, change the key, and confirm the score and PDF controls disappear while the workflow returns to the affected steps; regenerate and confirm the new score appears and the previous artifact is no longer reachable.
@@ -25,6 +61,10 @@ Covers the PRD decisions on stale Pieces and supersession, and connects the inva
 - [ ] Given a replacement Piece is created, then the previous Piece's SVG reference becomes unreachable immediately and cleanup begins with `cleanupReason` `replacement`.
 - [ ] Given a replacement whose rendering later fails, then the superseded artifact is still unreachable and its cleanup still proceeds.
 - [ ] Given cleanup that exhausts its retries, then the user operation still completes and the orphan log from Issue 29 is emitted.
+- [ ] Given a Piece, then staleness is derived by comparing its `sourceParameterVersion` to the current workflow version rather than read from a stored flag.
+- [ ] Given a parameter changed and then changed back to its original value, then the Piece remains stale and its score and PDF surfaces remain hidden.
+- [ ] Given each row of the direct-actions table, then the route refuses independently of whether its control was rendered, and no LilyPond call, artifact read, or grant creation occurs.
+- [ ] Given an outstanding PDF grant whose Piece has become stale, then the grant is revoked and the download serves no bytes.
 
 ### User stories addressed
 

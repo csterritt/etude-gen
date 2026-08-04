@@ -2,6 +2,7 @@
 name: Notes/AGENTS.md
 description: As an agent, how to use skills for the project.
 ---
+
 ## Available Skills
 
 - `write-a-prd` - You must read this when it is time to write a product requirements document by working through a dialog, starting from a list of requirements

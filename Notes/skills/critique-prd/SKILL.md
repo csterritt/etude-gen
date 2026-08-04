@@ -15,7 +15,7 @@ Ask the user for the PRD to examine, and any input files that are relevant to th
 
 Also ask for the file format and location where the PRD critique should be saved.
 
-Read through the PRD and any relevant input files for: 
+Read through the PRD and any relevant input files for:
 
 - Missing elements
 - Incomplete elements

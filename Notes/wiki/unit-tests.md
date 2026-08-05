@@ -78,3 +78,31 @@ A catalog and summaries of all unit tests under `tests/`.
 - Each category is logged with its typed category and the correlation identifier.
 - No forbidden fields (user identifier, Piece content, LilyPond source, grant identifier, credential) leak for any category.
 - Every refusal log line includes the correlation identifier.
+
+## helpers/test-db.spec.ts
+
+2 smoke tests for the test-database helper (`tests/helpers/test-db.ts`):
+
+- Creates an in-memory SQLite database with the production schema applied, inserts a user row, and reads it back.
+- Enforces the user email uniqueness constraint (direct second insert throws).
+
+## etude-params-repository.spec.ts
+
+9 tests covering `loadOrCreateEtudeParams` and `loadEtudeParams` from `src/lib/etude-params-repository.ts`, using the `tests/helpers/test-db.ts` real-SQLite helper:
+
+- Creates one record with the default values (8 measures, 4/4, C major, octave range 4, right hand, `workflowVersion` 1, `aggregateEpoch` 1) for a new user.
+- Does not create a second record on a second call and returns the same aggregate (idempotent).
+- Reports no confirmed steps on a freshly created aggregate.
+- Treats a uniqueness violation as a load of the winner aggregate, not an error (losing-caller path).
+- Results in exactly one aggregate when two concurrent `Promise.all` calls race for the same new user.
+- Rejects a direct second insert for a user who already has one aggregate (database UNIQUE constraint).
+- `loadEtudeParams` is owner-scoped and never returns another user's aggregate.
+- `loadEtudeParams` returns the owner aggregate when one exists.
+- Cascade deletion: removing the user row removes the `etude_params` row.
+
+## canonical-route.spec.ts
+
+2 tests covering `resolveCanonicalRoute` from `src/lib/canonical-route.ts`:
+
+- Routes to `/etude/setup` when no aggregate exists.
+- Routes to `/etude/setup` when setup is not confirmed.

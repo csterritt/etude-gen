@@ -87,6 +87,48 @@ export const interestedEmail = sqliteTable('interestedEmail', {
   email: text('email').primaryKey().unique(),
 })
 
+/**
+ * Etude parameter aggregate — one current workflow per owning student.
+ *
+ * The owner reference carries a database-level UNIQUE constraint so that
+ * one aggregate per owner is enforced independently of any application-level
+ * check. The FK cascades on user deletion so removing a user row removes
+ * their etude parameter record. Physical columns are encapsulated behind
+ * the EtudeParams repository interface; routes and tests must not depend on
+ * them directly.
+ *
+ * `workflowVersion` is the compare-and-set token incremented by parameter-form
+ * POSTs (setup/notes/split). `aggregateEpoch` is the monotonic token bumped by
+ * Start Over and moved to a terminal value by account deletion; every
+ * conditional write performed by an operation POST requires the epoch captured
+ * at acquisition to still be current (cross-cutting contract section 4).
+ *
+ * Step completion is per-step confirmation: a step is confirmed by a successful
+ * POST to it, not by having valid default values. A freshly created aggregate
+ * has all three confirmation flags false, so the canonical route is
+ * `/etude/setup` with defaults pre-populated but not pre-confirmed
+ * (cross-cutting contract section 5).
+ */
+export const etudeParams = sqliteTable('etude_params', {
+  id: text('id').primaryKey(),
+  userId: text('userId')
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  measureCount: integer('measureCount').notNull().default(8),
+  timeSignature: text('timeSignature').notNull().default('4/4'),
+  keySignature: text('keySignature').notNull().default('C major'),
+  octaveRange: integer('octaveRange').notNull().default(4),
+  hand: text('hand').notNull().default('right'),
+  workflowVersion: integer('workflowVersion').notNull().default(1),
+  aggregateEpoch: integer('aggregateEpoch').notNull().default(1),
+  setupConfirmed: integer('setupConfirmed', { mode: 'boolean' }).default(false).notNull(),
+  notesConfirmed: integer('notesConfirmed', { mode: 'boolean' }).default(false).notNull(),
+  splitConfirmed: integer('splitConfirmed', { mode: 'boolean' }).default(false).notNull(),
+  createdAt: integer('createdAt', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull(),
+})
+
 // Define schema object for export
 export const schema = {
   user,
@@ -95,6 +137,7 @@ export const schema = {
   verification,
   interestedEmail,
   singleUseCode,
+  etudeParams,
 }
 
 export type User = typeof user.$inferSelect
@@ -110,3 +153,5 @@ export type NewAccount = typeof account.$inferInsert
 export type NewVerification = typeof verification.$inferInsert
 export type NewInterestedEmail = typeof interestedEmail.$inferInsert
 export type NewSingleUseCode = typeof singleUseCode.$inferInsert
+export type EtudeParam = typeof etudeParams.$inferSelect
+export type NewEtudeParam = typeof etudeParams.$inferInsert

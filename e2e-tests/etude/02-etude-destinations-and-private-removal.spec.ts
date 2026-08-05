@@ -17,7 +17,7 @@ test.describe('Etude entry route replaces /private', () => {
       await signInUser(page, TEST_USERS.KNOWN_USER.email, TEST_USERS.KNOWN_USER.password)
 
       expect(page.url()).toContain(ETUDE_PATH)
-      await expect(page.getByTestId('etude-page-banner')).toBeVisible()
+      await expect(page.getByTestId('etude-setup-banner')).toBeVisible()
     }),
   )
 

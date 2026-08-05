@@ -18,7 +18,7 @@ test.describe('Etude entry route protection', () => {
     await verifyOnSignInPage(page)
     await verifyAlert(page, ERROR_MESSAGES.MUST_SIGN_IN)
 
-    await expect(page.getByTestId('etude-page-banner')).toHaveCount(0)
+    await expect(page.getByTestId('etude-setup-banner')).toHaveCount(0)
   })
 
   test(
@@ -29,7 +29,7 @@ test.describe('Etude entry route protection', () => {
 
       const response = await page.goto(ETUDE_PATH)
 
-      await expect(page.getByTestId('etude-page-banner')).toBeVisible()
+      await expect(page.getByTestId('etude-setup-banner')).toBeVisible()
       expect(response?.headers()['cache-control']).toContain('no-store')
       expect(response?.headers()['cache-control']).toContain('no-cache')
       expect(response?.headers()['pragma']).toBe('no-cache')

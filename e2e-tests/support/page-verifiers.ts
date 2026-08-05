@@ -21,7 +21,7 @@ export const verifyOnInterestSignUpPage = verifyOnSignUpPage
 export const verifyOnGatedSignUpPage = verifyOnSignUpPage
 
 export const verifyOnEtudePage = async (page: Page) => {
-  expect(await verifyElementExists(page, 'etude-page-banner')).toBe(true)
+  expect(await verifyElementExists(page, 'etude-setup-banner')).toBe(true)
 }
 
 export const verifyOnAwaitVerificationPage = async (page: Page) => {

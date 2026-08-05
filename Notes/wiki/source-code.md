@@ -24,6 +24,20 @@ Defines the typed correlation context that threads a request's correlation ident
 
 Logs lost-lock, stale-operation, stale-epoch, and stale-Piece refusals with a typed category and enough context to diagnose them without logging user identifiers, Piece content, LilyPond source, grant identifiers, or credentials. Defines a `RefusalCategory` string-literal union and a `RefusalContext` carrying only safe fields (`category`, `correlationId`, optional `reason`); `logRefusal` emits one structured warning line via the redacting `logWarn`, passing only the safe fields through. The refusal decisions themselves are owned by later issues. Exports `RefusalCategory`, `REFUSAL_CATEGORIES`, `RefusalContext`, `logRefusal`.
 
+### etude-params-repository.ts
+
+Repository for the `etude_params` aggregate, encapsulating the physical Drizzle columns behind a domain `EtudeParams` interface. `loadOrCreateEtudeParams(db, userId)` atomically inserts a default aggregate or loads the existing one — the caller that loses the insert race handles the UNIQUE-constraint violation on the owner reference as a load of the winner's aggregate, not as an error (the violation is detected across both the D1 and bun-sqlite drivers, which surface it with different error shapes). `loadEtudeParams(db, userId)` is an owner-scoped read returning `null` when none exists. Both follow the `withRetry`/`toResult` Result-returning pattern from `src/lib/db-access.ts`. The default aggregate carries the PRD's practical defaults (8 measures, 4/4, C major, octave range 4, right hand), `workflowVersion` 1, `aggregateEpoch` 1, and all three step-confirmation flags (`setupConfirmed`, `notesConfirmed`, `splitConfirmed`) false. Exports `EtudeParams`, `loadOrCreateEtudeParams`, `loadEtudeParams`.
+
+### canonical-route.ts
+
+Pure resolver mapping an `EtudeParams` snapshot (or `null` when no aggregate exists) to the canonical route for the current workflow state, per cross-cutting contract section 5. Completion is per-step confirmation: defaults pre-populate controls but do not pre-confirm steps. Issue 4 handles the first two rows of the state table — no aggregate and setup-not-confirmed both resolve to `/etude/setup`. Later issues extend the resolver with the notes/split/review/score rows. Exports `resolveCanonicalRoute`.
+
+## db/
+
+### schema.ts
+
+Drizzle ORM schema for the D1 database. Defines the `user`, `session`, `account`, `verification`, `singleUseCode`, `interestedEmail`, and `etude_params` tables. The `etude_params` table (added in Issue 4) carries one etude parameter aggregate per owning student: a text primary key, a `userId` column referencing `user.id` with `onDelete: 'cascade'` and a database-level `UNIQUE` constraint, default-value columns (8 measures, 4/4, C major, octave range 4, right hand), `workflowVersion` and `aggregateEpoch` integers, three step-confirmation boolean flags, and `createdAt`/`updatedAt` timestamps. Exports the table definitions, the `schema` object, and inferred `*Select`/`*Insert` types.
+
 ## middleware/
 
 ### correlation-id.ts
@@ -34,7 +48,7 @@ Generates a UUID v4 per request, stores it on the Hono context (`correlationId`)
 
 ### build-etude.tsx
 
-The authenticated etude entry route (`GET /etude`), registered in `src/index.ts` with `secureHeaders(STANDARD_SECURE_HEADERS)` and the `signedInAccess` middleware. A signed-out visitor is redirected to sign-in with the explanatory "You must sign in to visit that page" message (handled by `signedInAccess`); a signed-in student sees a placeholder heading (`data-testid="etude-page-banner"`) with no-cache headers. This route replaces the former `/private` placeholder — `/private` is unregistered and falls through to the standard 404 handler. Exports `buildEtude`.
+The authenticated etude workflow entry route and setup-step stub, registered in `src/index.ts` with `secureHeaders(STANDARD_SECURE_HEADERS)` and the `signedInAccess` middleware. `GET /etude` loads (or creates) the owner's etude parameter aggregate via `loadOrCreateEtudeParams`, resolves the canonical route for the current workflow state via `resolveCanonicalRoute`, and redirects (303) to it — a freshly created aggregate has no confirmed steps, so the canonical route is `/etude/setup`. `GET /etude/setup` renders a placeholder setup-step banner (`data-testid="etude-setup-banner"`) so the redirect lands on a real page; Issue 5 replaces this stub with the real setup form. A signed-out visitor is redirected to sign-in by `signedInAccess`. On an unexpected repository failure the handler delegates to `handleUnexpectedError` so the safe error page renders with a correlation identifier rather than a 500. Exports `buildEtude`.
 
 ### build-health.tsx
 

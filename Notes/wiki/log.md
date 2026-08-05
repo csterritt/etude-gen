@@ -80,3 +80,31 @@ Modified test files:
 - 10 existing spec files updated from `/private` references to `/etude` equivalents.
 
 Wiki pages updated: `source-code.md`, `e2e-tests.md`, `project-overview.md`.
+
+## [2026-08-04] ingest | issue-004 etude params aggregate defaults resume
+
+Ingested the etude parameter aggregate, repository, canonical routing, and resume-on-return behavior (issue #4).
+
+New source files:
+- `src/lib/etude-params-repository.ts` — repository for the `etude_params` aggregate; `loadOrCreateEtudeParams` (atomic insert-or-load, uniqueness-violation-as-load) and `loadEtudeParams` (owner-scoped read); `EtudeParams` domain interface encapsulating physical columns.
+- `src/lib/canonical-route.ts` — pure resolver mapping aggregate state to the canonical route (no aggregate / setup unconfirmed → `/etude/setup`).
+
+Modified source files:
+- `src/db/schema.ts` — added `etude_params` table (owner FK + cascade + DB UNIQUE, default values, `workflowVersion`, `aggregateEpoch`, three confirmation flags, timestamps) and inferred types.
+- `src/constants.ts` — added `PATHS.ETUDE_SETUP`.
+- `src/routes/build-etude.tsx` — `GET /etude` now load-or-create-and-redirect to the canonical route; added `GET /etude/setup` stub route with `etude-setup-banner`.
+
+New test files:
+- `tests/helpers/test-db.ts` — in-memory SQLite test-DB helper applying the production schema.
+- `tests/helpers/test-db.spec.ts` — 2 smoke tests for the helper.
+- `tests/etude-params-repository.spec.ts` — 9 tests for defaults, idempotency, owner-scoping, uniqueness, losing-caller path, Promise.all idempotency, no confirmed steps, cascade.
+- `tests/canonical-route.spec.ts` — 2 tests for the no-aggregate and setup-unconfirmed cases.
+- `e2e-tests/etude/03-etude-resume.spec.ts` — 2 Playwright tests for redirect-to-setup and resume-on-return.
+
+Modified test files:
+- `e2e-tests/support/page-verifiers.ts` — `verifyOnEtudePage` now checks `etude-setup-banner`.
+- `e2e-tests/etude/01-etude-protected-route.spec.ts`, `02-etude-destinations-and-private-removal.spec.ts` — updated to assert `etude-setup-banner`.
+
+Migration: `drizzle/0000_outstanding_wildside.sql` generated and applied to local D1 via `build-schema-update.sh`.
+
+Wiki pages updated: `source-code.md`, `e2e-tests.md`, `project-overview.md`, `unit-tests.md`.

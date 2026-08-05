@@ -44,3 +44,23 @@ A catalog and summaries of all end-to-end tests under `e2e-tests/`.
 
 - `verifyOnEtudePage` now checks `etude-setup-banner` (was `etude-page-banner`) since `GET /etude` redirects to `/etude/setup`.
 - `e2e-tests/etude/01-etude-protected-route.spec.ts` and `02-etude-destinations-and-private-removal.spec.ts` updated to assert `etude-setup-banner`.
+
+## etude/04-etude-setup-form.spec.ts
+
+1 Playwright test covering the `GET /etude/setup` form from Issue 5:
+
+- Renders a form (`etude-setup-form`) pre-populated with the saved aggregate defaults (8 measures, 4/4 meter, right hand), with native HTML constraints (number input with min=4, max=32, step=1, required; select with fixed option lists for meter and hands), accessible labels for every control, and a hidden `workflowVersion` field carrying the current version.
+
+## etude/05-etude-setup-submit.spec.ts
+
+9 Playwright tests covering the `POST /etude/setup` handler from Issue 5:
+
+- A valid submission (16 measures, 3/4, both hands) redirects 303 to `/etude/setup`, persists the new values after reload, and increments the workflow version by 1.
+- An out-of-range measure count (33) submitted via multipart POST (bypassing native constraints) is rejected with 303, no persistence, and no 500.
+- An unsupported meter (6/8) is rejected with 303, no persistence, and no 500.
+- An unknown hand value is rejected with 303, no persistence, and no 500.
+- An empty measures value is rejected with 303 and no 500, and is not coerced to a default.
+- An absent meter field is rejected with 303 and no 500.
+- A repeated hands field (two values via browser fetch + FormData) is rejected with 303 and no 500, never coerced.
+- An unexpected extra field is ignored and the expected fields are validated identically and accepted.
+- Fields in an arbitrary order are validated identically and accepted.

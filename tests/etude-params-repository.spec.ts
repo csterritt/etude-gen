@@ -17,8 +17,10 @@ import type { DrizzleClient } from '../src/local-types'
 import {
   loadOrCreateEtudeParams,
   loadEtudeParams,
+  updateEtudeSetup,
   type EtudeParams,
 } from '../src/lib/etude-params-repository'
+import type { ValidSetup } from '../src/lib/setup-validator'
 import { createTestDb } from './helpers/test-db'
 
 const unwrap = <T, E>(result: Result<T, E>): T => {
@@ -188,5 +190,107 @@ describe('cascade deletion', () => {
     await db.delete(user).where(eq(user.id, 'user-10')).run()
 
     expect(await countEtudeParamsForUser(db, 'user-10')).toBe(0)
+  })
+})
+
+const validSetup: ValidSetup = {
+  measureCount: 16,
+  timeSignature: '3/4',
+  hand: 'both',
+}
+
+describe('updateEtudeSetup', () => {
+  it('persists the measure count, time signature, and hand values', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-20', 'twenty@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-20'))
+
+    const result = await updateEtudeSetup(db, 'user-20', before.aggregateEpoch, validSetup)
+
+    const after = unwrap(result)
+    expect(after.measureCount).toBe(16)
+    expect(after.timeSignature).toBe('3/4')
+    expect(after.hand).toBe('both')
+  })
+
+  it('increments workflowVersion by exactly 1', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-21', 'twentyone@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-21'))
+
+    const result = await updateEtudeSetup(db, 'user-21', before.aggregateEpoch, validSetup)
+
+    const after = unwrap(result)
+    expect(after.workflowVersion).toBe(before.workflowVersion + 1)
+  })
+
+  it('sets setupConfirmed to true', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-22', 'twentytwo@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-22'))
+
+    const result = await updateEtudeSetup(db, 'user-22', before.aggregateEpoch, validSetup)
+
+    const after = unwrap(result)
+    expect(after.setupConfirmed).toBe(true)
+  })
+
+  it('leaves notesConfirmed and splitConfirmed unchanged', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-23', 'twentythree@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-23'))
+
+    const result = await updateEtudeSetup(db, 'user-23', before.aggregateEpoch, validSetup)
+
+    const after = unwrap(result)
+    expect(after.notesConfirmed).toBe(false)
+    expect(after.splitConfirmed).toBe(false)
+  })
+
+  it('rejects when the supplied epoch no longer matches the stored epoch and persists nothing', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-24', 'twentyfour@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-24'))
+
+    const staleEpoch = before.aggregateEpoch - 1
+    const result = await updateEtudeSetup(db, 'user-24', staleEpoch, validSetup)
+
+    expect(result.isErr).toBe(true)
+    // Reload and confirm the stored aggregate is unchanged.
+    const reloaded = unwrap(await loadEtudeParams(db, 'user-24'))
+    expect(reloaded?.measureCount).toBe(before.measureCount)
+    expect(reloaded?.timeSignature).toBe(before.timeSignature)
+    expect(reloaded?.hand).toBe(before.hand)
+    expect(reloaded?.workflowVersion).toBe(before.workflowVersion)
+    expect(reloaded?.setupConfirmed).toBe(false)
+  })
+
+  it('returns an error and creates no row when the user owns no aggregate', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-25', 'twentyfive@example.com')
+
+    const result = await updateEtudeSetup(db, 'user-25', 1, validSetup)
+
+    expect(result.isErr).toBe(true)
+    expect(await countEtudeParamsForUser(db, 'user-25')).toBe(0)
+  })
+
+  it('is owner-scoped and never affects another user aggregate', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-26', 'twentysix@example.com')
+    await insertUser(db, 'user-27', 'twentyseven@example.com')
+    const ownerBefore = unwrap(await loadOrCreateEtudeParams(db, 'user-26'))
+    const other = unwrap(await loadOrCreateEtudeParams(db, 'user-27'))
+
+    const result = await updateEtudeSetup(db, 'user-26', ownerBefore.aggregateEpoch, validSetup)
+
+    const ownerAfter = unwrap(result)
+    expect(ownerAfter.userId).toBe('user-26')
+    // The other user's aggregate is untouched.
+    const otherReloaded = unwrap(await loadEtudeParams(db, 'user-27'))
+    expect(otherReloaded?.id).toBe(other.id)
+    expect(otherReloaded?.measureCount).toBe(other.measureCount)
+    expect(otherReloaded?.workflowVersion).toBe(other.workflowVersion)
+    expect(otherReloaded?.setupConfirmed).toBe(false)
   })
 })

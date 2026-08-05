@@ -108,3 +108,26 @@ Modified test files:
 Migration: `drizzle/0000_outstanding_wildside.sql` generated and applied to local D1 via `build-schema-update.sh`.
 
 Wiki pages updated: `source-code.md`, `e2e-tests.md`, `project-overview.md`, `unit-tests.md`.
+
+## [2026-08-04] ingest | issue-005 setup step measures meter hands
+
+Ingested the setup-step form, domain validator, reusable form parser, and `updateEtudeSetup` repository function (issue #5).
+
+New source files:
+- `src/lib/setup-validator.ts` — authoritative domain validator for measure count (4-32), time signature (2/4, 3/4, 4/4), and hand (left, right, both); reports all failures together; never coerces invalid values to defaults.
+- `src/lib/etude-form-parser.ts` — reusable parameter-form parser tolerating hostile shapes (absent, empty, repeated, extra, arbitrary-order fields) without throwing; `FieldSpec`-driven for reuse by later issues.
+
+Modified source files:
+- `src/lib/etude-params-repository.ts` — added `updateEtudeSetup` (compare-and-set on `aggregateEpoch`, increments `workflowVersion`, sets `setupConfirmed`).
+- `src/routes/build-etude.tsx` — `GET /etude/setup` now renders the real form (native HTML constraints, accessible labels, hidden `workflowVersion`); added `POST /etude/setup` handler (parse → validate → load epoch → conditional update → 303 redirect; hostile shapes rejected with 303, never 500).
+
+New test files:
+- `tests/setup-validator.spec.ts` — 20 tests for measure/meter/hand validation, boundary values, no-coercion, and multi-field reporting.
+- `tests/etude-form-parser.spec.ts` — 9 tests for valid parsing, hostile shapes, arbitrary order, never-throws, and first-wins normalization.
+- `e2e-tests/etude/04-etude-setup-form.spec.ts` — 1 Playwright test for the GET form (pre-populated defaults, native constraints, accessible labels, hidden version).
+- `e2e-tests/etude/05-etude-setup-submit.spec.ts` — 9 Playwright tests for valid submission persistence, rejection of out-of-range/unsupported/unknown values, hostile shapes (empty, absent, repeated, extra, arbitrary order), all with 303 and no 500.
+
+Modified test files:
+- `tests/etude-params-repository.spec.ts` — added 6 tests for `updateEtudeSetup` (persistence, version increment, setupConfirmed, unchanged flags, epoch mismatch, owner-scoping).
+
+Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`.

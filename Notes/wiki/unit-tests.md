@@ -88,7 +88,7 @@ A catalog and summaries of all unit tests under `tests/`.
 
 ## etude-params-repository.spec.ts
 
-9 tests covering `loadOrCreateEtudeParams` and `loadEtudeParams` from `src/lib/etude-params-repository.ts`, using the `tests/helpers/test-db.ts` real-SQLite helper:
+15 tests covering `loadOrCreateEtudeParams`, `loadEtudeParams`, and `updateEtudeSetup` from `src/lib/etude-params-repository.ts`, using the `tests/helpers/test-db.ts` real-SQLite helper:
 
 - Creates one record with the default values (8 measures, 4/4, C major, octave range 4, right hand, `workflowVersion` 1, `aggregateEpoch` 1) for a new user.
 - Does not create a second record on a second call and returns the same aggregate (idempotent).
@@ -99,6 +99,36 @@ A catalog and summaries of all unit tests under `tests/`.
 - `loadEtudeParams` is owner-scoped and never returns another user's aggregate.
 - `loadEtudeParams` returns the owner aggregate when one exists.
 - Cascade deletion: removing the user row removes the `etude_params` row.
+- `updateEtudeSetup` persists the measure count, time signature, and hand values.
+- `updateEtudeSetup` increments `workflowVersion` by exactly 1.
+- `updateEtudeSetup` sets `setupConfirmed` to true.
+- `updateEtudeSetup` leaves `notesConfirmed` and `splitConfirmed` unchanged.
+- `updateEtudeSetup` rejects when the supplied epoch no longer matches the stored epoch and persists nothing.
+- `updateEtudeSetup` returns an error and creates no row when the user owns no aggregate.
+- `updateEtudeSetup` is owner-scoped and never affects another user's aggregate.
+
+## setup-validator.spec.ts
+
+20 tests covering `validateSetup` from `src/lib/setup-validator.ts`:
+
+- Measure count: accepts boundaries 4 and 32, accepts mid-range 16, rejects 3 (below min), rejects 33 (above max), rejects decimals, rejects non-numeric strings, rejects empty string (no coercion), rejects null (no coercion), rejects undefined (no coercion).
+- Time signature: accepts 2/4, 3/4, 4/4; rejects 6/8, rejects 5/4, rejects empty string (no coercion), rejects null (no coercion).
+- Hand: accepts left, right, both; rejects unknown strings, rejects empty string (no coercion), rejects null (no coercion).
+- Multiple invalid fields: all reported together, not first-only; never throws on invalid input.
+
+## etude-form-parser.spec.ts
+
+9 tests covering `parseParameterForm` from `src/lib/etude-form-parser.ts`:
+
+- Parses a valid body to the expected raw values with no failures.
+- Rejects an empty string for a field as a field-addressable failure (no coercion).
+- Rejects an absent field as a field-addressable failure.
+- Rejects a repeated field with two values rather than taking first or last.
+- Ignores an unexpected extra field and validates the expected fields identically.
+- Parses fields in an arbitrary order identically to the canonical order.
+- Never throws on a body with many extra fields.
+- Never throws on an empty form.
+- Applies a stated `first-wins` normalization when the spec declares it.
 
 ## canonical-route.spec.ts
 

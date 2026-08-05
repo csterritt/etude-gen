@@ -14,13 +14,14 @@
  * reference as a load of the winner's aggregate, not as an error.
  * @module lib/etude-params-repository
  */
-import { eq } from 'drizzle-orm'
+import { eq, and, sql } from 'drizzle-orm'
 import Result from 'true-myth/result'
 
 import { etudeParams } from '../db/schema'
 import type { EtudeParam } from '../db/schema'
 import type { DrizzleClient } from '../local-types'
 import { withRetry } from './db-access'
+import type { ValidSetup } from './setup-validator'
 
 /**
  * Domain view of the etude parameter aggregate.
@@ -196,6 +197,64 @@ const loadEtudeParamsActual = async (
       return Result.ok(null)
     }
     return Result.ok(mapToDomain(rows[0]!))
+  } catch (e) {
+    return Result.err(e instanceof Error ? e : new Error(String(e)))
+  }
+}
+
+/**
+ * Conditionally update the setup-step fields of the owner's aggregate.
+ *
+ * Verifies the aggregate epoch at commit (cross-cutting contract section 4):
+ * the `where` clause matches both `userId` and `aggregateEpoch ===
+ * expectedEpoch`, so a request whose captured epoch no longer matches the
+ * stored value updates zero rows and returns `Result.err`. On success the
+ * same committed transition increments `workflowVersion` by 1, sets
+ * `setupConfirmed` to true, and updates the measure/meter/hand columns.
+ * Never read-then-unconditionally-write.
+ * @param db - Database instance
+ * @param userId - Authenticated owner user id
+ * @param expectedEpoch - Aggregate epoch captured at acquisition
+ * @param values - Validated setup values from the domain validator
+ * @returns Promise<Result<EtudeParams, Error>> — epoch mismatch is reported
+ * as a generic Error to avoid leaking internal state; the caller treats all
+ * failures as a safe retry-the-form rejection.
+ */
+export const updateEtudeSetup = (
+  db: DrizzleClient,
+  userId: string,
+  expectedEpoch: number,
+  values: ValidSetup,
+): Promise<Result<EtudeParams, Error>> =>
+  withRetry('updateEtudeSetup', () => updateEtudeSetupActual(db, userId, expectedEpoch, values))
+
+const updateEtudeSetupActual = async (
+  db: DrizzleClient,
+  userId: string,
+  expectedEpoch: number,
+  values: ValidSetup,
+): Promise<Result<EtudeParams, Error>> => {
+  try {
+    const updated = await db
+      .update(etudeParams)
+      .set({
+        measureCount: values.measureCount,
+        timeSignature: values.timeSignature,
+        hand: values.hand,
+        setupConfirmed: true,
+        workflowVersion: sql`${etudeParams.workflowVersion} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(eq(etudeParams.userId, userId), eq(etudeParams.aggregateEpoch, expectedEpoch)),
+      )
+      .returning()
+    if (updated.length === 0) {
+      // Either no aggregate exists for this owner, or the epoch no longer
+      // matches. Both are safe rejections, never a 500.
+      return Result.err(new Error('epoch-mismatch'))
+    }
+    return Result.ok(mapToDomain(updated[0]!))
   } catch (e) {
     return Result.err(e instanceof Error ? e : new Error(String(e)))
   }

@@ -36,67 +36,67 @@ const failureFor = (failures: SetupValidationFailure[], field: string): SetupVal
 
 describe('validateSetup measure count', () => {
   it('accepts the lower boundary 4', () => {
-    const result = validateSetup({ measureCount: '4', timeSignature: '4/4', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '4', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isOk).toBe(true)
     expect(unwrap(result).measureCount).toBe(4)
   })
 
   it('accepts the upper boundary 32', () => {
-    const result = validateSetup({ measureCount: '32', timeSignature: '4/4', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '32', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isOk).toBe(true)
     expect(unwrap(result).measureCount).toBe(32)
   })
 
   it('accepts a mid-range value like 16', () => {
-    const result = validateSetup({ measureCount: '16', timeSignature: '4/4', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '16', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isOk).toBe(true)
     expect(unwrap(result).measureCount).toBe(16)
   })
 
   it('rejects 3 as below the minimum with a measures field failure', () => {
-    const result = validateSetup({ measureCount: '3', timeSignature: '4/4', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '3', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'measures')).toBeDefined()
   })
 
   it('rejects 33 as above the maximum with a measures field failure', () => {
-    const result = validateSetup({ measureCount: '33', timeSignature: '4/4', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '33', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'measures')).toBeDefined()
   })
 
   it('rejects a decimal like 8.5 with a measures field failure', () => {
-    const result = validateSetup({ measureCount: '8.5', timeSignature: '4/4', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '8.5', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'measures')).toBeDefined()
   })
 
   it('rejects a non-numeric string with a measures field failure', () => {
-    const result = validateSetup({ measureCount: 'abc', timeSignature: '4/4', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: 'abc', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'measures')).toBeDefined()
   })
 
   it('rejects an empty string and does not coerce it to a default', () => {
-    const result = validateSetup({ measureCount: '', timeSignature: '4/4', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'measures')).toBeDefined()
   })
 
   it('rejects null and does not coerce it to a default', () => {
-    const result = validateSetup({ measureCount: null, timeSignature: '4/4', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: null, timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'measures')).toBeDefined()
   })
 
   it('rejects undefined and does not coerce it to a default', () => {
-    const result = validateSetup({ measureCount: undefined, timeSignature: '4/4', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: undefined, timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'measures')).toBeDefined()
@@ -105,46 +105,46 @@ describe('validateSetup measure count', () => {
 
 describe('validateSetup time signature', () => {
   it('accepts 2/4', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '2/4', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '8', timeSignature: '2/4', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isOk).toBe(true)
     expect(unwrap(result).timeSignature).toBe('2/4')
   })
 
   it('accepts 3/4', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '3/4', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '8', timeSignature: '3/4', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isOk).toBe(true)
     expect(unwrap(result).timeSignature).toBe('3/4')
   })
 
   it('accepts 4/4', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isOk).toBe(true)
     expect(unwrap(result).timeSignature).toBe('4/4')
   })
 
   it('rejects 6/8 with a meter field failure', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '6/8', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '8', timeSignature: '6/8', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'meter')).toBeDefined()
   })
 
   it('rejects an unsupported meter like 5/4 with a meter field failure', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '5/4', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '8', timeSignature: '5/4', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'meter')).toBeDefined()
   })
 
   it('rejects an empty string and does not coerce it to a default', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '8', timeSignature: '', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'meter')).toBeDefined()
   })
 
   it('rejects null and does not coerce it to a default', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: null, hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '8', timeSignature: null, hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'meter')).toBeDefined()
@@ -153,39 +153,39 @@ describe('validateSetup time signature', () => {
 
 describe('validateSetup hand', () => {
   it('accepts left', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'left', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'left', keySignature: 'C major', octaves: ['4'] })
     expect(result.isOk).toBe(true)
     expect(unwrap(result).hand).toBe('left')
   })
 
   it('accepts right', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['4'] })
     expect(result.isOk).toBe(true)
     expect(unwrap(result).hand).toBe('right')
   })
 
   it('accepts both', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'both', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'both', keySignature: 'C major', octaves: ['4'] })
     expect(result.isOk).toBe(true)
     expect(unwrap(result).hand).toBe('both')
   })
 
   it('rejects an unknown hand string with a hands field failure', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'both-hands', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'both-hands', keySignature: 'C major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'hands')).toBeDefined()
   })
 
   it('rejects an empty string and does not coerce it to a default', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: '', keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: '', keySignature: 'C major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'hands')).toBeDefined()
   })
 
   it('rejects null and does not coerce it to a default', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: null, keySignature: 'C major' })
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: null, keySignature: 'C major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'hands')).toBeDefined()
@@ -195,49 +195,49 @@ describe('validateSetup hand', () => {
 describe('validateSetup key signature', () => {
   it('accepts each of the eighteen supported keys and echoes it back as keySignature', () => {
     for (const key of SUPPORTED_KEYS) {
-      const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: key })
+      const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: key, octaves: ['4'] })
       expect(result.isOk).toBe(true)
       expect(unwrap(result).keySignature).toBe(key)
     }
   })
 
   it('rejects an unsupported key (B major — five sharps) with a key field failure', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'B major' })
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'B major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'key')).toBeDefined()
   })
 
   it('rejects an over-four-accidental key (G-sharp minor — five sharps) with a key field failure', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'G-sharp minor' })
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'G-sharp minor', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'key')).toBeDefined()
   })
 
   it('rejects an empty string for the key with a key field failure and does not coerce to the default C major', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: '' })
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: '', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'key')).toBeDefined()
   })
 
   it('rejects null for the key with a key field failure', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: null })
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: null, octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'key')).toBeDefined()
   })
 
   it('rejects undefined for the key with a key field failure', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: undefined })
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: undefined, octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'key')).toBeDefined()
   })
 
   it('rejects a non-string key value with a key field failure', () => {
-    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 42 })
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 42, octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'key')).toBeDefined()
@@ -246,7 +246,7 @@ describe('validateSetup key signature', () => {
 
 describe('validateSetup multiple invalid fields', () => {
   it('reports all invalid fields at once, not just the first', () => {
-    const result = validateSetup({ measureCount: '99', timeSignature: '6/8', hand: 'both-hands', keySignature: 'B major' })
+    const result = validateSetup({ measureCount: '99', timeSignature: '6/8', hand: 'both-hands', keySignature: 'B major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'measures')).toBeDefined()
@@ -257,7 +257,7 @@ describe('validateSetup multiple invalid fields', () => {
   })
 
   it('reports both an invalid key and an invalid measure count together', () => {
-    const result = validateSetup({ measureCount: '99', timeSignature: '4/4', hand: 'right', keySignature: 'B major' })
+    const result = validateSetup({ measureCount: '99', timeSignature: '4/4', hand: 'right', keySignature: 'B major', octaves: ['4'] })
     expect(result.isErr).toBe(true)
     const failures = unwrapErr(result)
     expect(failureFor(failures, 'measures')).toBeDefined()
@@ -266,6 +266,76 @@ describe('validateSetup multiple invalid fields', () => {
   })
 
   it('never throws on invalid input', () => {
-    expect(() => validateSetup({ measureCount: {}, timeSignature: [], hand: {}, keySignature: {} })).not.toThrow()
+    expect(() => validateSetup({ measureCount: {}, timeSignature: [], hand: {}, keySignature: {}, octaves: ['4'] })).not.toThrow()
+  })
+})
+
+describe('validateSetup octaves field', () => {
+  it('accepts a valid octave set and returns the normalized number[] in ValidSetup', () => {
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['2', '4', '6'] })
+    expect(result.isOk).toBe(true)
+    expect(unwrap(result).octaves).toEqual([2, 4, 6])
+  })
+
+  it('normalizes arbitrary order to one ascending set', () => {
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['5', '2', '3'] })
+    expect(result.isOk).toBe(true)
+    expect(unwrap(result).octaves).toEqual([2, 3, 5])
+  })
+
+  it('normalizes duplicate values to one ascending set', () => {
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['4', '4', '2', '2'] })
+    expect(result.isOk).toBe(true)
+    expect(unwrap(result).octaves).toEqual([2, 4])
+  })
+
+  it('accepts a single octave as a one-element array', () => {
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['3'] })
+    expect(result.isOk).toBe(true)
+    expect(unwrap(result).octaves).toEqual([3])
+  })
+
+  it('rejects an empty octave array with a field-addressable failure naming octaves', () => {
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: [] })
+    expect(result.isErr).toBe(true)
+    expect(failureFor(unwrapErr(result), 'octaves')).toBeDefined()
+  })
+
+  it('rejects null for octaves with a field-addressable failure naming octaves', () => {
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: null })
+    expect(result.isErr).toBe(true)
+    expect(failureFor(unwrapErr(result), 'octaves')).toBeDefined()
+  })
+
+  it('rejects undefined for octaves with a field-addressable failure naming octaves', () => {
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: undefined })
+    expect(result.isErr).toBe(true)
+    expect(failureFor(unwrapErr(result), 'octaves')).toBeDefined()
+  })
+
+  it('rejects an out-of-range octave below the minimum with a field-addressable failure', () => {
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['1'] })
+    expect(result.isErr).toBe(true)
+    expect(failureFor(unwrapErr(result), 'octaves')).toBeDefined()
+  })
+
+  it('rejects an out-of-range octave above the maximum with a field-addressable failure', () => {
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['7'] })
+    expect(result.isErr).toBe(true)
+    expect(failureFor(unwrapErr(result), 'octaves')).toBeDefined()
+  })
+
+  it('rejects a non-numeric string element with a field-addressable failure', () => {
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'C major', octaves: ['x'] })
+    expect(result.isErr).toBe(true)
+    expect(failureFor(unwrapErr(result), 'octaves')).toBeDefined()
+  })
+
+  it('reports both an invalid key and an empty octave array together', () => {
+    const result = validateSetup({ measureCount: '8', timeSignature: '4/4', hand: 'right', keySignature: 'B major', octaves: [] })
+    expect(result.isErr).toBe(true)
+    const failures = unwrapErr(result)
+    expect(failureFor(failures, 'key')).toBeDefined()
+    expect(failureFor(failures, 'octaves')).toBeDefined()
   })
 })

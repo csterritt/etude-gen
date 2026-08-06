@@ -186,3 +186,102 @@ describe('parseParameterForm repeated-field normalization', () => {
     expect(unwrap(result).measures).toBe('8')
   })
 })
+
+describe('parseParameterForm string-multi field type', () => {
+  it('collects all submitted values into a string[] in submission order', () => {
+    const spec: FieldSpec = {
+      fields: { octaves: { type: 'string-multi' } },
+    }
+    const fd = buildFormData([
+      ['octaves', '2'],
+      ['octaves', '4'],
+      ['octaves', '6'],
+    ])
+    const result = parseParameterForm(fd, spec)
+    expect(result.isOk).toBe(true)
+    expect(unwrap(result).octaves).toEqual(['2', '4', '6'])
+  })
+
+  it('preserves arbitrary submission order without sorting (normalization is the validator job)', () => {
+    const spec: FieldSpec = {
+      fields: { octaves: { type: 'string-multi' } },
+    }
+    const fd = buildFormData([
+      ['octaves', '5'],
+      ['octaves', '2'],
+      ['octaves', '3'],
+    ])
+    const result = parseParameterForm(fd, spec)
+    expect(result.isOk).toBe(true)
+    expect(unwrap(result).octaves).toEqual(['5', '2', '3'])
+  })
+
+  it('preserves duplicate values without deduplicating (normalization is the validator job)', () => {
+    const spec: FieldSpec = {
+      fields: { octaves: { type: 'string-multi' } },
+    }
+    const fd = buildFormData([
+      ['octaves', '4'],
+      ['octaves', '4'],
+      ['octaves', '2'],
+    ])
+    const result = parseParameterForm(fd, spec)
+    expect(result.isOk).toBe(true)
+    expect(unwrap(result).octaves).toEqual(['4', '4', '2'])
+  })
+
+  it('rejects an absent multi-value field as a field-addressable failure', () => {
+    const spec: FieldSpec = {
+      fields: { octaves: { type: 'string-multi' } },
+    }
+    const fd = new FormData()
+    const result = parseParameterForm(fd, spec)
+    expect(result.isErr).toBe(true)
+    expect(failureFor(unwrapErr(result), 'octaves')).toBeDefined()
+  })
+
+  it('returns a one-element array for a single submitted value, not a bare string', () => {
+    const spec: FieldSpec = {
+      fields: { octaves: { type: 'string-multi' } },
+    }
+    const fd = buildFormData([['octaves', '3']])
+    const result = parseParameterForm(fd, spec)
+    expect(result.isOk).toBe(true)
+    expect(unwrap(result).octaves).toEqual(['3'])
+  })
+
+  it('mixes a single-value field and a multi-value field in the same result', () => {
+    const spec: FieldSpec = {
+      fields: {
+        measures: { type: 'string' },
+        octaves: { type: 'string-multi' },
+      },
+    }
+    const fd = buildFormData([
+      ['measures', '8'],
+      ['octaves', '2'],
+      ['octaves', '4'],
+    ])
+    const result = parseParameterForm(fd, spec)
+    expect(result.isOk).toBe(true)
+    const values = unwrap(result)
+    expect(values.measures).toBe('8')
+    expect(values.octaves).toEqual(['2', '4'])
+  })
+
+  it('ignores an unexpected extra field and leaves the multi-value field intact', () => {
+    const spec: FieldSpec = {
+      fields: { octaves: { type: 'string-multi' } },
+    }
+    const fd = buildFormData([
+      ['octaves', '2'],
+      ['foo', 'bar'],
+      ['octaves', '5'],
+    ])
+    const result = parseParameterForm(fd, spec)
+    expect(result.isOk).toBe(true)
+    const values = unwrap(result)
+    expect(values.octaves).toEqual(['2', '5'])
+    expect(values.foo).toBeUndefined()
+  })
+})

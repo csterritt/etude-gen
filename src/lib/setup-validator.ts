@@ -5,12 +5,13 @@
 /**
  * Setup step domain validator.
  *
- * Authoritative validation for the setup step's four parameters: measure
+ * Authoritative validation for the setup step's five parameters: measure
  * count (4-32 inclusive integer), time signature (one of 2/4, 3/4, 4/4),
- * hand (left, right, both), and key (one of the eighteen supported keys).
- * Lives in the Music Domain module so the route never trusts submitted
- * values. Returns typed, field-addressable failures so the route can wire
- * them to the correct controls.
+ * hand (left, right, both), key (one of the eighteen supported keys), and
+ * octaves (one or more values from 2 through 6). Lives in the Music Domain
+ * module so the route never trusts submitted values. Returns typed,
+ * field-addressable failures so the route can wire them to the correct
+ * controls.
  *
  * Invalid values are never silently coerced into plausible defaults: an
  * empty string, null, undefined, a wrong type, or an out-of-range value is
@@ -21,6 +22,7 @@
 import Result from 'true-myth/result'
 
 import { validateKey } from './key-domain'
+import { validateOctaves } from './music-domain'
 
 /**
  * Inclusive lower bound for the measure count.
@@ -48,7 +50,7 @@ export const SUPPORTED_HANDS = ['left', 'right', 'both'] as const
  * description of the supported range or combination.
  */
 export interface SetupValidationFailure {
-  field: 'measures' | 'meter' | 'hands' | 'key'
+  field: 'measures' | 'meter' | 'hands' | 'key' | 'octaves'
   reason: string
 }
 
@@ -61,6 +63,7 @@ export interface ValidSetup {
   timeSignature: string
   hand: string
   keySignature: string
+  octaves: number[]
 }
 
 /**
@@ -72,6 +75,7 @@ export interface SetupInput {
   timeSignature: unknown
   hand: unknown
   keySignature: unknown
+  octaves: unknown
 }
 
 const MEASURES_REASON = `Measure count must be a whole number between ${MEASURE_MIN} and ${MEASURE_MAX}.`
@@ -142,10 +146,10 @@ const validateHand = (value: unknown): SetupValidationFailure | null => {
 }
 
 /**
- * Validate the four setup fields independently and collect every failure
+ * Validate the five setup fields independently and collect every failure
  * into a single array, so a submission with multiple invalid fields reports
  * all of them at once. Returns `Result.ok` with the validated typed values
- * only when all four fields pass. Never throws.
+ * only when all five fields pass. Never throws.
  * @param input - Untrusted setup values from the form parser
  * @returns Result<ValidSetup, SetupValidationFailure[]>
  */
@@ -167,10 +171,14 @@ export const validateSetup = (input: SetupInput): Result<ValidSetup, SetupValida
   if (keyResult.isErr) {
     failures.push(keyResult.error)
   }
+  const octavesResult = validateOctaves(input.octaves)
+  if (octavesResult.isErr) {
+    failures.push(octavesResult.error)
+  }
   if (failures.length > 0) {
     return Result.err(failures)
   }
-  // All four fields passed; narrow them to their validated representations.
+  // All five fields passed; narrow them to their validated representations.
   const measureCount =
     typeof input.measureCount === 'number'
       ? input.measureCount
@@ -178,5 +186,6 @@ export const validateSetup = (input: SetupInput): Result<ValidSetup, SetupValida
   const timeSignature = String(input.timeSignature).trim()
   const hand = String(input.hand).trim()
   const keySignature = keyResult.isOk ? keyResult.value : ''
-  return Result.ok({ measureCount, timeSignature, hand, keySignature })
+  const octaves = octavesResult.isOk ? octavesResult.value : []
+  return Result.ok({ measureCount, timeSignature, hand, keySignature, octaves })
 }

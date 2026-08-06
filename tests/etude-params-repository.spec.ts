@@ -57,6 +57,7 @@ const assertDefaults = (params: EtudeParams): void => {
   expect(params.measureCount).toBe(8)
   expect(params.timeSignature).toBe('4/4')
   expect(params.keySignature).toBe('C major')
+  expect(params.selectedOctaves).toBe('4')
   expect(params.octaveRange).toBe(4)
   expect(params.hand).toBe('right')
   expect(params.workflowVersion).toBe(1)
@@ -198,6 +199,7 @@ const validSetup: ValidSetup = {
   timeSignature: '3/4',
   hand: 'both',
   keySignature: 'C major',
+  octaves: [4],
 }
 
 /**
@@ -361,6 +363,7 @@ describe('updateEtudeSetup key persistence and key-change invalidation', () => {
       timeSignature: '2/4',
       hand: 'left',
       keySignature: before.keySignature,
+      octaves: [4],
     })
 
     const after = unwrap(result)
@@ -382,6 +385,7 @@ describe('updateEtudeSetup key persistence and key-change invalidation', () => {
       timeSignature: before.timeSignature,
       hand: before.hand,
       keySignature: before.keySignature,
+      octaves: [4],
     })
 
     const after = unwrap(result)
@@ -402,6 +406,7 @@ describe('updateEtudeSetup key persistence and key-change invalidation', () => {
       timeSignature: before.timeSignature,
       hand: before.hand,
       keySignature: before.keySignature,
+      octaves: [4],
     })
 
     const after = unwrap(result)
@@ -427,6 +432,123 @@ describe('updateEtudeSetup key persistence and key-change invalidation', () => {
     // Reload and confirm nothing changed — no invalidation took place.
     const reloaded = unwrap(await loadEtudeParams(db, 'user-35'))
     expect(reloaded?.keySignature).toBe(before.keySignature)
+    expect(reloaded?.workflowVersion).toBe(before.workflowVersion)
+    expect(reloaded?.notesConfirmed).toBe(true)
+    expect(reloaded?.splitConfirmed).toBe(true)
+  })
+})
+
+describe('updateEtudeSetup octave persistence and octave-change invalidation', () => {
+  it('persists the selectedOctaves value as a normalized comma-separated string', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-40', 'forty@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-40'))
+
+    const result = await updateEtudeSetup(db, 'user-40', before.aggregateEpoch, {
+      ...validSetup,
+      octaves: [2, 4, 6],
+    })
+
+    const after = unwrap(result)
+    expect(after.selectedOctaves).toBe('2,4,6')
+    expect(after.workflowVersion).toBe(before.workflowVersion + 1)
+    expect(after.setupConfirmed).toBe(true)
+  })
+
+  it('clears notesConfirmed and splitConfirmed when only the octaves change', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-41', 'fortyone@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-41'))
+    await confirmNotesAndSplit(db, 'user-41')
+    const confirmed = unwrap(await loadEtudeParams(db, 'user-41'))
+    expect(confirmed?.notesConfirmed).toBe(true)
+    expect(confirmed?.splitConfirmed).toBe(true)
+
+    const result = await updateEtudeSetup(db, 'user-41', before.aggregateEpoch, {
+      ...validSetup,
+      octaves: [2, 3, 4, 5, 6],
+    })
+
+    const after = unwrap(result)
+    expect(after.selectedOctaves).toBe('2,3,4,5,6')
+    expect(after.notesConfirmed).toBe(false)
+    expect(after.splitConfirmed).toBe(false)
+  })
+
+  it('leaves notesConfirmed and splitConfirmed unchanged when octaves are identical but another field changes', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-42', 'fortytwo@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-42'))
+    await confirmNotesAndSplit(db, 'user-42')
+
+    const result = await updateEtudeSetup(db, 'user-42', before.aggregateEpoch, {
+      measureCount: 12,
+      timeSignature: '2/4',
+      hand: 'left',
+      keySignature: before.keySignature,
+      octaves: [4],
+    })
+
+    const after = unwrap(result)
+    expect(after.notesConfirmed).toBe(true)
+    expect(after.splitConfirmed).toBe(true)
+    expect(after.workflowVersion).toBe(before.workflowVersion + 1)
+  })
+
+  it('does not increment the workflow version when all five fields are identical to the stored ones', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-43', 'fortythree@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-43'))
+    await confirmNotesAndSplit(db, 'user-43')
+
+    const result = await updateEtudeSetup(db, 'user-43', before.aggregateEpoch, {
+      measureCount: before.measureCount,
+      timeSignature: before.timeSignature,
+      hand: before.hand,
+      keySignature: before.keySignature,
+      octaves: [4],
+    })
+
+    const after = unwrap(result)
+    expect(after.workflowVersion).toBe(before.workflowVersion)
+    expect(after.notesConfirmed).toBe(true)
+    expect(after.splitConfirmed).toBe(true)
+  })
+
+  it('clears notesConfirmed and splitConfirmed when both key and octaves change', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-44', 'fortyfour@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-44'))
+    await confirmNotesAndSplit(db, 'user-44')
+
+    const result = await updateEtudeSetup(db, 'user-44', before.aggregateEpoch, {
+      ...validSetup,
+      keySignature: 'A minor',
+      octaves: [2, 3, 4, 5, 6],
+    })
+
+    const after = unwrap(result)
+    expect(after.keySignature).toBe('A minor')
+    expect(after.selectedOctaves).toBe('2,3,4,5,6')
+    expect(after.notesConfirmed).toBe(false)
+    expect(after.splitConfirmed).toBe(false)
+  })
+
+  it('still rejects an epoch mismatch and performs no octave invalidation', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-45', 'fortyfive@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-45'))
+    await confirmNotesAndSplit(db, 'user-45')
+
+    const staleEpoch = before.aggregateEpoch - 1
+    const result = await updateEtudeSetup(db, 'user-45', staleEpoch, {
+      ...validSetup,
+      octaves: [2, 3, 4, 5, 6],
+    })
+
+    expect(result.isErr).toBe(true)
+    const reloaded = unwrap(await loadEtudeParams(db, 'user-45'))
+    expect(reloaded?.selectedOctaves).toBe(before.selectedOctaves)
     expect(reloaded?.workflowVersion).toBe(before.workflowVersion)
     expect(reloaded?.notesConfirmed).toBe(true)
     expect(reloaded?.splitConfirmed).toBe(true)

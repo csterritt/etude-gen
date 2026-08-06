@@ -16,6 +16,7 @@ const baseParams = (overrides: Partial<EtudeParams> = {}): EtudeParams => ({
   measureCount: 8,
   timeSignature: '4/4',
   keySignature: 'C major',
+  selectedOctaves: '4',
   octaveRange: 4,
   hand: 'right',
   workflowVersion: 1,

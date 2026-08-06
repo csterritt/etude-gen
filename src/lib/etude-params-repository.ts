@@ -35,6 +35,7 @@ export interface EtudeParams {
   measureCount: number
   timeSignature: string
   keySignature: string
+  selectedOctaves: string
   octaveRange: number
   hand: string
   workflowVersion: number
@@ -56,6 +57,7 @@ const mapToDomain = (row: EtudeParam): EtudeParams => ({
   measureCount: row.measureCount,
   timeSignature: row.timeSignature,
   keySignature: row.keySignature,
+  selectedOctaves: row.selectedOctaves,
   octaveRange: row.octaveRange,
   hand: row.hand,
   workflowVersion: row.workflowVersion,
@@ -100,8 +102,8 @@ const isUniqueViolation = (e: unknown): boolean => {
 /**
  * Build a new default etude parameter aggregate row for the given owner.
  *
- * Defaults: 8 measures, 4/4, C major, octave range 4, right hand,
- * workflowVersion 1, aggregateEpoch 1, no confirmed steps.
+ * Defaults: 8 measures, 4/4, C major, selected octaves '4', octave range 4,
+ * right hand, workflowVersion 1, aggregateEpoch 1, no confirmed steps.
  */
 const buildDefaultRow = (userId: string): typeof etudeParams.$inferInsert => {
   const now = new Date()
@@ -111,6 +113,7 @@ const buildDefaultRow = (userId: string): typeof etudeParams.$inferInsert => {
     measureCount: 8,
     timeSignature: '4/4',
     keySignature: 'C major',
+    selectedOctaves: '4',
     octaveRange: 4,
     hand: 'right',
     workflowVersion: 1,
@@ -250,21 +253,24 @@ const updateEtudeSetupActual = async (
       return Result.err(new Error('epoch-mismatch'))
     }
     const stored = current[0]!
+    const submittedOctavesString = values.octaves.join(',')
     const identicalResubmit =
       stored.measureCount === values.measureCount &&
       stored.timeSignature === values.timeSignature &&
       stored.hand === values.hand &&
-      stored.keySignature === values.keySignature
+      stored.keySignature === values.keySignature &&
+      stored.selectedOctaves === submittedOctavesString
     if (identicalResubmit) {
       return Result.ok(mapToDomain(stored))
     }
 
-    // A key change invalidates the downstream pitch-selection and split-
-    // boundary confirmation flags (Issue 11 dependency map row for Key).
-    // At this stage only the confirmation flags exist, so those are
-    // cleared. When the key is identical but another field changed, the
-    // downstream flags are left untouched.
+    // A key or octave-range change invalidates the downstream pitch-selection
+    // and split-boundary confirmation flags (Issue 11 dependency map rows for
+    // Key and Octave Range). At this stage only the confirmation flags exist,
+    // so those are cleared. When neither key nor octaves changed but another
+    // field changed, the downstream flags are left untouched.
     const keyChanged = stored.keySignature !== values.keySignature
+    const octavesChanged = stored.selectedOctaves !== submittedOctavesString
     const updated = await db
       .update(etudeParams)
       .set({
@@ -272,9 +278,10 @@ const updateEtudeSetupActual = async (
         timeSignature: values.timeSignature,
         hand: values.hand,
         keySignature: values.keySignature,
+        selectedOctaves: submittedOctavesString,
         setupConfirmed: true,
         workflowVersion: sql`${etudeParams.workflowVersion} + 1`,
-        ...(keyChanged ? { notesConfirmed: false, splitConfirmed: false } : {}),
+        ...(keyChanged || octavesChanged ? { notesConfirmed: false, splitConfirmed: false } : {}),
         updatedAt: new Date(),
       })
       .where(

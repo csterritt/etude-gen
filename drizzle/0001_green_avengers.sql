@@ -1,0 +1,1 @@
+ALTER TABLE `etude_params` ADD `selectedOctaves` text DEFAULT '4' NOT NULL;

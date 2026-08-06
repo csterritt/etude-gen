@@ -42,6 +42,7 @@ test.describe('POST /etude/setup key submission', () => {
         meter: '4/4',
         hands: 'right',
         key: 'E-flat major',
+        octaves: '4',
         workflowVersion: '1',
       })
 
@@ -70,6 +71,7 @@ test.describe('POST /etude/setup key submission', () => {
         meter: '4/4',
         hands: 'right',
         key: 'B major',
+        octaves: '4',
         workflowVersion: '1',
       })
 
@@ -94,6 +96,7 @@ test.describe('POST /etude/setup key submission', () => {
         meter: '4/4',
         hands: 'right',
         key: '',
+        octaves: '4',
         workflowVersion: '1',
       })
 
@@ -123,6 +126,7 @@ test.describe('POST /etude/setup key submission', () => {
         fd.append('hands', 'right')
         fd.append('key', 'C major')
         fd.append('key', 'E-flat major')
+        fd.append('octaves', '4')
         fd.append('workflowVersion', '1')
         const res = await fetch('/etude/setup', {
           method: 'POST',
@@ -152,6 +156,7 @@ test.describe('POST /etude/setup key submission', () => {
         meter: '3/4',
         hands: 'both',
         key: 'A minor',
+        octaves: '4',
         workflowVersion: '1',
         foo: 'bar',
       })
@@ -185,6 +190,7 @@ test.describe('POST /etude/setup key submission', () => {
         meter: '4/4',
         hands: 'right',
         key: 'C major',
+        octaves: '4',
         workflowVersion: initialVersion,
       })
 
@@ -213,6 +219,7 @@ test.describe('POST /etude/setup key submission', () => {
         meter: '4/4',
         hands: 'right',
         key: 'A minor',
+        octaves: '4',
         workflowVersion: initialVersion,
       })
 

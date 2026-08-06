@@ -118,6 +118,10 @@ export const etudeParams = sqliteTable('etude_params', {
   measureCount: integer('measureCount').notNull().default(8),
   timeSignature: text('timeSignature').notNull().default('4/4'),
   keySignature: text('keySignature').notNull().default('C major'),
+  // Normalized ascending octave selection stored as a comma-separated string
+  // (e.g. '2,3,4,5,6'). The default '4' matches the previous single-octave
+  // default. The legacy `octaveRange` integer column is retained but unused.
+  selectedOctaves: text('selectedOctaves').notNull().default('4'),
   octaveRange: integer('octaveRange').notNull().default(4),
   hand: text('hand').notNull().default('right'),
   workflowVersion: integer('workflowVersion').notNull().default(1),

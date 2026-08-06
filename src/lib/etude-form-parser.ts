@@ -34,8 +34,17 @@ export type RepeatedFieldPolicy = 'reject' | 'first-wins'
  * Per-field specification within a `FieldSpec`.
  */
 export interface FieldSpecEntry {
-  /** Target type for the field. Currently only `string` is supported. */
-  type: 'string'
+  /**
+   * Target type for the field.
+   * - `string`: a single-value field. A repeated submission is governed
+   *   by the `repeated` policy.
+   * - `string-multi`: a multi-value field. All submitted values are
+   *   collected into a `string[]` in submission order. An absent field
+   *   (zero values) is a field-addressable failure. Duplicates and
+   *   arbitrary order are preserved — normalization is the validator's
+   *   responsibility. The `repeated` policy does not apply.
+   */
+  type: 'string' | 'string-multi'
   /** Repeated-field policy; defaults to `reject` when omitted. */
   repeated?: RepeatedFieldPolicy
 }
@@ -59,11 +68,11 @@ export interface ParseFailure {
 }
 
 /**
- * Extracted raw values keyed by expected field name. Each value is the
- * single string the form parser kept after applying the repeated-field
- * policy. Unexpected extra fields do not appear here.
+ * Extracted raw values keyed by expected field name. A `string` field
+ * yields a single string; a `string-multi` field yields a `string[]` in
+ * submission order. Unexpected extra fields do not appear here.
  */
-export type RawValues = Record<string, string>
+export type RawValues = Record<string, string | string[]>
 
 const repeatedReason = (field: string): string =>
   `The ${field} field was submitted more than once. Please submit it once.`
@@ -74,19 +83,32 @@ const emptyReason = (field: string): string => `The ${field} field must not be e
 
 /**
  * Read all values for a single field name from the `FormData` and apply the
- * repeated-field policy. Returns the kept single value (if any), the count
- * of submitted values, and a parse failure if the policy rejected the
- * submission.
+ * field's type and repeated-field policy. For a `string` field, returns the
+ * kept single value (if any) after applying the repeated-field policy. For
+ * a `string-multi` field, returns all submitted values as a `string[]` in
+ * submission order (duplicates and arbitrary order preserved). Returns a
+ * parse failure when the policy rejects the submission or the field is
+ * absent.
  */
 const readField = (
   formData: FormData,
   name: string,
   entry: FieldSpecEntry,
-): { value: string | null; count: number; failure: ParseFailure | null } => {
+): {
+  value: string | string[] | null
+  count: number
+  failure: ParseFailure | null
+} => {
   const all = formData.getAll(name)
   const count = all.length
   if (count === 0) {
     return { value: null, count, failure: { field: name, reason: absentReason(name) } }
+  }
+  if (entry.type === 'string-multi') {
+    // Collect every submitted value, preserving submission order, duplicates,
+    // and arbitrary order. Normalization is the validator's responsibility.
+    const collected = all.map((v) => (typeof v === 'string' ? v : String(v ?? '')))
+    return { value: collected, count, failure: null }
   }
   if (count > 1) {
     const policy: RepeatedFieldPolicy = entry.repeated ?? 'reject'

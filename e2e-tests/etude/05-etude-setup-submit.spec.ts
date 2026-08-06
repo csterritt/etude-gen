@@ -85,6 +85,7 @@ test.describe('POST /etude/setup rejections bypass native constraints', () => {
         measures: '33',
         meter: '4/4',
         hands: 'right',
+        octaves: '4',
         workflowVersion: '1',
       })
 
@@ -109,6 +110,7 @@ test.describe('POST /etude/setup rejections bypass native constraints', () => {
         measures: '8',
         meter: '6/8',
         hands: 'right',
+        octaves: '4',
         workflowVersion: '1',
       })
 
@@ -131,6 +133,7 @@ test.describe('POST /etude/setup rejections bypass native constraints', () => {
         measures: '8',
         meter: '4/4',
         hands: 'both-hands',
+        octaves: '4',
         workflowVersion: '1',
       })
 
@@ -155,6 +158,7 @@ test.describe('POST /etude/setup hostile shapes', () => {
         measures: '',
         meter: '4/4',
         hands: 'right',
+        octaves: '4',
         workflowVersion: '1',
       })
 
@@ -177,6 +181,7 @@ test.describe('POST /etude/setup hostile shapes', () => {
       const response = await postSetupViaBrowser(page, {
         measures: '8',
         hands: 'right',
+        octaves: '4',
         workflowVersion: '1',
       })
 
@@ -204,6 +209,7 @@ test.describe('POST /etude/setup hostile shapes', () => {
         fd.append('meter', '4/4')
         fd.append('hands', 'left')
         fd.append('hands', 'right')
+        fd.append('octaves', '4')
         fd.append('workflowVersion', '1')
         const res = await fetch('/etude/setup', {
           method: 'POST',
@@ -234,6 +240,7 @@ test.describe('POST /etude/setup hostile shapes', () => {
         meter: '3/4',
         hands: 'both',
         key: 'C major',
+        octaves: '4',
         workflowVersion: '1',
         foo: 'bar',
       })
@@ -263,6 +270,7 @@ test.describe('POST /etude/setup hostile shapes', () => {
           meter: '2/4',
           measures: '12',
           key: 'C major',
+        octaves: '4',
           workflowVersion: '1',
         },
         maxRedirects: 0,

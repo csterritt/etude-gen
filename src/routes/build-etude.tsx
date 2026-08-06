@@ -35,13 +35,17 @@ import { handleUnexpectedError } from './build-safe-error'
 import { logError, sanitizeError } from '../lib/logger'
 import { validateSetup, SUPPORTED_METERS, SUPPORTED_HANDS } from '../lib/setup-validator'
 import { SUPPORTED_KEYS, deriveKeyPitches } from '../lib/key-domain'
+import { OCTAVE_MIN, OCTAVE_MAX, deriveAvailablePitches } from '../lib/music-domain'
 import { parseParameterForm, type FieldSpec } from '../lib/etude-form-parser'
 import { redirectWithError, redirectWithMessage } from '../lib/redirects'
 
 /**
- * Field specification for the setup parameter form. The setup form has four
- * expected fields and declares no repeated-field normalization, so a
- * repeated field is a reject (cross-cutting contract section 2 rule 5).
+ * Field specification for the setup parameter form. The setup form has five
+ * expected fields. The octave field is multi-value (checkboxes), so it uses
+ * the `string-multi` type which collects all submitted values into a
+ * `string[]`. The single-value fields declare no repeated-field
+ * normalization, so a repeated field is a reject (cross-cutting contract
+ * section 2 rule 5).
  */
 const SETUP_FIELD_SPEC: FieldSpec = {
   fields: {
@@ -49,7 +53,22 @@ const SETUP_FIELD_SPEC: FieldSpec = {
     meter: { type: 'string' },
     hands: { type: 'string' },
     key: { type: 'string' },
+    octaves: { type: 'string-multi' },
   },
+}
+
+/**
+ * Parse the stored `selectedOctaves` comma-separated string into a sorted
+ * `number[]` for form pre-selection and available-pitch derivation. Falls
+ * back to `[4]` (the default) when the string is empty or unparseable.
+ */
+const parseStoredOctaves = (stored: string): number[] => {
+  const parts = stored.split(',').map((s) => s.trim()).filter((s) => s !== '')
+  const nums = parts.map(Number).filter((n) => Number.isInteger(n))
+  if (nums.length === 0) {
+    return [4]
+  }
+  return nums.sort((a, b) => a - b)
 }
 
 /**
@@ -61,6 +80,8 @@ const SETUP_FIELD_SPEC: FieldSpec = {
  * and increments on success).
  */
 const renderEtudeSetupForm = (params: EtudeParams) => {
+  const selectedOctaves = parseStoredOctaves(params.selectedOctaves)
+  const availablePitches = deriveAvailablePitches(params.keySignature, selectedOctaves)
   return (
     <div data-testid='etude-setup-banner' className='flex justify-center'>
       <div className='card w-full max-w-md bg-base-100 shadow-xl'>
@@ -158,6 +179,33 @@ const renderEtudeSetupForm = (params: EtudeParams) => {
               </p>
               <p data-testid='key-pitches' className='text-sm text-gray-700 mt-1'>
                 {deriveKeyPitches(params.keySignature).join(' ')}
+              </p>
+            </div>
+            <div className='form-control mb-6'>
+              <span className='label-text mb-2'>Octaves</span>
+              <p className='text-xs text-gray-500 mt-1'>Select one or more octaves from 2 through 6.</p>
+              <div className='flex flex-col gap-1 mt-2'>
+                {Array.from({ length: OCTAVE_MAX - OCTAVE_MIN + 1 }, (_, i) => {
+                  const octave = OCTAVE_MIN + i
+                  const checked = selectedOctaves.includes(octave)
+                  return (
+                    <label key={octave} className='label cursor-pointer justify-start gap-2'>
+                      <input
+                        type='checkbox'
+                        name='octaves'
+                        value={String(octave)}
+                        checked={checked}
+                        data-testid='octaves-field'
+                        id={`octaves-field-${octave}`}
+                        className='checkbox checkbox-sm'
+                      />
+                      <span className='label-text'>Octave {octave}</span>
+                    </label>
+                  )
+                })}
+              </div>
+              <p data-testid='available-range' className='text-xs text-gray-500 mt-2'>
+                Available range: {availablePitches.lowest} to {availablePitches.highest}
               </p>
             </div>
             <div className='card-actions justify-end'>
@@ -269,6 +317,7 @@ export const buildEtude = (app: Hono<{ Bindings: Bindings }>): void => {
         timeSignature: raw.meter,
         hand: raw.hands,
         keySignature: raw.key,
+        octaves: raw.octaves,
       })
       if (validation.isErr) {
         const firstReason = validation.error[0]?.reason ?? 'Invalid setup submission.'

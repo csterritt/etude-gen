@@ -82,5 +82,25 @@ A catalog and summaries of all end-to-end tests under `e2e-tests/`.
 - An empty key value is rejected with 303, no persistence, no 500, and no silent fallback to the stored or default key.
 - A repeated key field (two values via browser fetch + FormData) is rejected with a deterministic 303 and no 500.
 - An extra unexpected field alongside a valid key does not affect the outcome for the expected fields.
-- Resubmitting the identical values (same measures, meter, hands, key as stored) does not increment the workflow version.
+- Resubmitting the identical values (same measures, meter, hands, key, octaves as stored) does not increment the workflow version.
 - Changing only the key (from C major to A minor) increments the workflow version and the form re-displays with the new key and its derived pitches.
+
+## etude/08-etude-setup-octave-form.spec.ts
+
+4 Playwright tests covering the `GET /etude/setup` octave field and derived-range display from Issue 7:
+
+- Renders five checkboxes (`data-testid="octaves-field"`) for octaves 2 through 6, each with `name="octaves"` and the correct value, with the stored octave (4) pre-checked and the others unchecked, and accessible labels ("Octave 2" through "Octave 6").
+- Displays the lowest and highest available pitch for the default key and octave (C major, octave 4: C4 to C5) via `data-testid="available-range"`.
+- After checking octaves 2 and 5 (and unchecking 4) the range covers the continuous expansion from octave 2 through 5 (C2 to C6).
+- After checking octave 6 in C major the highest available pitch becomes C7 (C natural in key, C7 at the top of the expanded range).
+
+## etude/09-etude-setup-octave-submit.spec.ts
+
+6 Playwright tests covering the `POST /etude/setup` octave submission from Issue 7:
+
+- A valid octave submission (2, 4, 6) redirects 303 to `/etude/setup` and the form re-displays with those octaves checked.
+- An out-of-range octave (7) submitted bypassing native constraints is rejected with 303 and no persistence.
+- An empty octave submission (no octaves field at all) is rejected with 303 and no persistence.
+- Arbitrary-order and duplicate octaves (5, 2, 5, 3, 2) are normalized to the same stored selection (2, 3, 5).
+- Changing only the octaves (from 4 to 2,3,4,5,6) increments the workflow version.
+- Resubmitting the identical values (including the same octaves) does not increment the workflow version.

@@ -155,3 +155,33 @@ Modified test files:
 - `e2e-tests/etude/05-etude-setup-submit.spec.ts` — two hostile-shape tests updated to include the `key` field in their submissions.
 
 Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`, `project-overview.md`.
+
+## [2026-08-06] ingest | issue-007 octave ranges, expansion, and C7 rule
+
+Ingested the octave scale-range selection, contiguous expansion, and C7 cap implementation for the setup step (issue #7).
+
+New source files:
+- `src/lib/music-domain.ts` — octave validation (`validateOctaves`), contiguous range expansion (`expandOctaveRange`), tonic-to-tonic scale-range pitch derivation with B-to-C octave crossing (`deriveScaleRangePitches`), and the full available-pitch derivation with the C7 cap (`deriveAvailablePitches`). The C7 cap removes every octave-7 pitch except C7, and keeps C7 only when C natural belongs to the key.
+
+Updated source files:
+- `src/lib/etude-form-parser.ts` — added the `string-multi` field type for multi-value fields (collects all submitted values into a `string[]` in submission order, preserving duplicates and arbitrary order; an absent field is a field-addressable failure). `RawValues` now allows `string | string[]`.
+- `src/lib/setup-validator.ts` — extended to five parameters: added the `octaves` field to `SetupInput`, `ValidSetup`, and `SetupValidationFailure`; delegates octave validation to `validateOctaves` from `music-domain.ts`; normalizes to an ascending `number[]` in `ValidSetup`.
+- `src/lib/etude-params-repository.ts` — added `selectedOctaves` (comma-separated string) to the `EtudeParams` interface and `mapToDomain`; `buildDefaultRow` sets it to `'4'`; `updateEtudeSetup` persists it and clears `notesConfirmed`/`splitConfirmed` when either key or octaves change (Issue 11 dependency map rows for Key and Octave Range); the identical-resubmit check now includes the normalized octave string.
+- `src/db/schema.ts` — added the `selectedOctaves` text column (default `'4'`) to `etude_params`; the legacy `octaveRange` integer column is retained but unused.
+- `src/routes/build-etude.tsx` — the setup form now renders five checkboxes (`data-testid="octaves-field"`) for octaves 2-6 with the stored octaves pre-checked, and displays the lowest and highest available pitch (`data-testid="available-range"`) derived from the selected key and octaves via `deriveAvailablePitches`; the `SETUP_FIELD_SPEC` declares the octave field as `string-multi`; the POST handler passes `raw.octaves` to `validateSetup`.
+- `drizzle/0001_green_avengers.sql` — migration adding the `selectedOctaves` column.
+
+New test files:
+- `tests/music-domain.spec.ts` — 28 tests covering octave validation (normalization, rejection of empty/null/undefined/out-of-range/non-numeric), range expansion, scale-range pitch derivation (D major, E-flat major, C major with B-to-C crossing), and available-pitch derivation with the C7 cap (C7 included for C/G major, excluded for D major/F-sharp minor, every other octave-7 pitch excluded).
+- `e2e-tests/etude/08-etude-setup-octave-form.spec.ts` — 4 Playwright tests covering the octave checkbox group and derived-range display on the GET setup form.
+- `e2e-tests/etude/09-etude-setup-octave-submit.spec.ts` — 6 Playwright tests covering POST octave submission (valid, out-of-range, empty, arbitrary-order/duplicate normalization, version increment on octave change, no increment on identical resubmit).
+
+Updated test files:
+- `tests/etude-form-parser.spec.ts` — extended to 16 tests covering the `string-multi` field type (collects all values in submission order, preserves duplicates and arbitrary order, rejects absent field, one-element array for single value, mixes with single-value fields, ignores extra fields).
+- `tests/setup-validator.spec.ts` — extended to 44 tests covering the octaves field (accepts valid set with normalized `number[]`, normalizes arbitrary order and duplicates, accepts single octave, rejects empty/null/undefined/out-of-range/non-numeric with octaves field failures, reports invalid key and empty octaves together).
+- `tests/etude-params-repository.spec.ts` — extended to 28 tests covering octave persistence (normalized comma-separated string), octave-change invalidation (clears flags when only octaves change), identical-octave resubmit leaves flags unchanged, identical-all-five-fields resubmit no version increment, both key and octaves change clears flags, epoch mismatch still rejects with no octave invalidation.
+- `tests/canonical-route.spec.ts` — `baseParams` updated to include `selectedOctaves: '4'`.
+- `e2e-tests/etude/05-etude-setup-submit.spec.ts` — all submissions updated to include `octaves: '4'`.
+- `e2e-tests/etude/07-etude-setup-key-submit.spec.ts` — all submissions updated to include `octaves: '4'`.
+
+Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`.

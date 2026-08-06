@@ -88,9 +88,9 @@ A catalog and summaries of all unit tests under `tests/`.
 
 ## etude-params-repository.spec.ts
 
-22 tests covering `loadOrCreateEtudeParams`, `loadEtudeParams`, and `updateEtudeSetup` from `src/lib/etude-params-repository.ts`, using the `tests/helpers/test-db.ts` real-SQLite helper:
+28 tests covering `loadOrCreateEtudeParams`, `loadEtudeParams`, and `updateEtudeSetup` from `src/lib/etude-params-repository.ts`, using the `tests/helpers/test-db.ts` real-SQLite helper:
 
-- Creates one record with the default values (8 measures, 4/4, C major, octave range 4, right hand, `workflowVersion` 1, `aggregateEpoch` 1) for a new user.
+- Creates one record with the default values (8 measures, 4/4, C major, selected octaves `'4'`, octave range 4, right hand, `workflowVersion` 1, `aggregateEpoch` 1) for a new user.
 - Does not create a second record on a second call and returns the same aggregate (idempotent).
 - Reports no confirmed steps on a freshly created aggregate.
 - Treats a uniqueness violation as a load of the winner aggregate, not an error (losing-caller path).
@@ -112,6 +112,12 @@ A catalog and summaries of all unit tests under `tests/`.
 - `updateEtudeSetup` does not increment the workflow version and changes no flags when all submitted values are identical to the stored ones.
 - `updateEtudeSetup` changing only a non-key field increments the version but does not clear `notesConfirmed` or `splitConfirmed`.
 - `updateEtudeSetup` still rejects an epoch mismatch and performs no invalidation.
+- `updateEtudeSetup` persists the `selectedOctaves` value as a normalized comma-separated string.
+- `updateEtudeSetup` clears `notesConfirmed` and `splitConfirmed` when only the octaves change.
+- `updateEtudeSetup` leaves the flags unchanged when octaves are identical but another field changes.
+- `updateEtudeSetup` does not increment the workflow version when all five fields are identical to the stored ones.
+- `updateEtudeSetup` clears the flags when both key and octaves change.
+- `updateEtudeSetup` still rejects an epoch mismatch and performs no octave invalidation.
 
 ## key-domain.spec.ts
 
@@ -132,17 +138,27 @@ A catalog and summaries of all unit tests under `tests/`.
 
 ## setup-validator.spec.ts
 
-33 tests covering `validateSetup` from `src/lib/setup-validator.ts`:
+44 tests covering `validateSetup` from `src/lib/setup-validator.ts`:
 
 - Measure count: accepts boundaries 4 and 32, accepts mid-range 16, rejects 3 (below min), rejects 33 (above max), rejects decimals, rejects non-numeric strings, rejects empty string (no coercion), rejects null (no coercion), rejects undefined (no coercion).
 - Time signature: accepts 2/4, 3/4, 4/4; rejects 6/8, rejects 5/4, rejects empty string (no coercion), rejects null (no coercion).
 - Hand: accepts left, right, both; rejects unknown strings, rejects empty string (no coercion), rejects null (no coercion).
 - Key signature: accepts each of the eighteen supported keys and echoes it back; rejects an unsupported key (B major), an over-four-accidental key (G-sharp minor), an empty string (no coercion to C major), null, undefined, and a non-string value, each with a key field failure.
-- Multiple invalid fields: all reported together (including the key field), not first-only; an invalid key and an invalid measure count reported together; never throws on invalid input.
+- Octaves: accepts a valid set and returns the normalized `number[]`; normalizes arbitrary order to one ascending set; normalizes duplicates to one ascending set; accepts a single octave as a one-element array; rejects an empty array, null, undefined, an out-of-range octave below the minimum, an out-of-range octave above the maximum, and a non-numeric string element, each with an octaves field failure.
+- Multiple invalid fields: all reported together (including the key and octaves fields), not first-only; an invalid key and an empty octave array reported together; never throws on invalid input.
+
+## music-domain.spec.ts
+
+28 tests covering `validateOctaves`, `expandOctaveRange`, `deriveScaleRangePitches`, and `deriveAvailablePitches` from `src/lib/music-domain.ts`:
+
+- `validateOctaves`: accepts a valid ascending set and returns the normalized `number[]`; normalizes arbitrary order to one ascending set; normalizes duplicate values to one ascending set; accepts a single octave; accepts the full range 2-6; rejects a non-array, null, undefined, an empty array, a non-numeric string element, an out-of-range octave below the minimum (1), an out-of-range octave above the maximum (7), and a non-integer decimal, each with a typed `OctaveValidationFailure` naming the octaves field.
+- `expandOctaveRange`: returns the contiguous min/max regardless of input order; returns the same range for a single-element selection.
+- `deriveScaleRangePitches`: produces the tonic-to-tonic pitch set for D major octave 4 using key spelling (D E F-sharp G A B C-sharp D5); produces the tonic-to-tonic pitch set for E-flat major octave 4 using flat spelling (E-flat F G A-flat B-flat C D-flat E-flat5); produces the correct set for C major octave 4 (C D E F G A B C5).
+- `deriveAvailablePitches`: includes C7 for G major octaves 2 through 6 (C in key, C7 inside range); includes C7 for C major octaves 2 through 6; excludes every octave-7 pitch other than C7 for A minor octaves 2 through 6; leaves C7 absent for D major octaves 2-6 (C not in key, range reaches octave 7); leaves C7 absent for F-sharp minor octaves 2-6 (C not in key); produces identical pitches for canonical and arbitrary-order submissions.
 
 ## etude-form-parser.spec.ts
 
-9 tests covering `parseParameterForm` from `src/lib/etude-form-parser.ts`:
+16 tests covering `parseParameterForm` from `src/lib/etude-form-parser.ts`:
 
 - Parses a valid body to the expected raw values with no failures.
 - Rejects an empty string for a field as a field-addressable failure (no coercion).
@@ -153,6 +169,7 @@ A catalog and summaries of all unit tests under `tests/`.
 - Never throws on a body with many extra fields.
 - Never throws on an empty form.
 - Applies a stated `first-wins` normalization when the spec declares it.
+- `string-multi` field type: collects all submitted values into a `string[]` in submission order; preserves arbitrary submission order without sorting; preserves duplicate values without deduplicating; rejects an absent multi-value field as a field-addressable failure; returns a one-element array for a single submitted value; mixes a single-value field and a multi-value field in the same result; ignores an unexpected extra field and leaves the multi-value field intact.
 
 ## canonical-route.spec.ts
 

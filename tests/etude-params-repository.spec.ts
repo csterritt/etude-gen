@@ -197,6 +197,20 @@ const validSetup: ValidSetup = {
   measureCount: 16,
   timeSignature: '3/4',
   hand: 'both',
+  keySignature: 'C major',
+}
+
+/**
+ * Set the notesConfirmed and splitConfirmed flags directly in the test DB
+ * so a subsequent updateEtudeSetup can be observed clearing them on a key
+ * change (or leaving them on an identical key resubmit).
+ */
+const confirmNotesAndSplit = async (db: DrizzleClient, userId: string): Promise<void> => {
+  await db
+    .update(etudeParams)
+    .set({ notesConfirmed: true, splitConfirmed: true })
+    .where(eq(etudeParams.userId, userId))
+    .run()
 }
 
 describe('updateEtudeSetup', () => {
@@ -292,5 +306,129 @@ describe('updateEtudeSetup', () => {
     expect(otherReloaded?.measureCount).toBe(other.measureCount)
     expect(otherReloaded?.workflowVersion).toBe(other.workflowVersion)
     expect(otherReloaded?.setupConfirmed).toBe(false)
+  })
+})
+
+describe('updateEtudeSetup key persistence and key-change invalidation', () => {
+  it('persists the keySignature value and increments the workflow version', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-30', 'thirty@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-30'))
+
+    const result = await updateEtudeSetup(db, 'user-30', before.aggregateEpoch, {
+      ...validSetup,
+      keySignature: 'E-flat major',
+    })
+
+    const after = unwrap(result)
+    expect(after.keySignature).toBe('E-flat major')
+    expect(after.workflowVersion).toBe(before.workflowVersion + 1)
+    expect(after.setupConfirmed).toBe(true)
+  })
+
+  it('clears notesConfirmed and splitConfirmed when the submitted key differs from the stored key', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-31', 'thirtyone@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-31'))
+    // Confirm the downstream steps directly so a key change can be observed
+    // clearing them in the same committed transition.
+    await confirmNotesAndSplit(db, 'user-31')
+    const confirmed = unwrap(await loadEtudeParams(db, 'user-31'))
+    expect(confirmed?.notesConfirmed).toBe(true)
+    expect(confirmed?.splitConfirmed).toBe(true)
+
+    const result = await updateEtudeSetup(db, 'user-31', before.aggregateEpoch, {
+      ...validSetup,
+      keySignature: 'A minor',
+    })
+
+    const after = unwrap(result)
+    expect(after.keySignature).toBe('A minor')
+    expect(after.notesConfirmed).toBe(false)
+    expect(after.splitConfirmed).toBe(false)
+  })
+
+  it('leaves notesConfirmed and splitConfirmed unchanged when the submitted key is identical to the stored key', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-32', 'thirtytwo@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-32'))
+    await confirmNotesAndSplit(db, 'user-32')
+
+    // Resubmit with the same key but a different non-key field so the
+    // version still increments; the confirmation flags must survive.
+    const result = await updateEtudeSetup(db, 'user-32', before.aggregateEpoch, {
+      measureCount: 12,
+      timeSignature: '2/4',
+      hand: 'left',
+      keySignature: before.keySignature,
+    })
+
+    const after = unwrap(result)
+    expect(after.keySignature).toBe(before.keySignature)
+    expect(after.notesConfirmed).toBe(true)
+    expect(after.splitConfirmed).toBe(true)
+    expect(after.workflowVersion).toBe(before.workflowVersion + 1)
+  })
+
+  it('does not increment the workflow version and changes no flags when all submitted values are identical to the stored ones', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-33', 'thirtythree@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-33'))
+    await confirmNotesAndSplit(db, 'user-33')
+
+    // Resubmit the exact stored values.
+    const result = await updateEtudeSetup(db, 'user-33', before.aggregateEpoch, {
+      measureCount: before.measureCount,
+      timeSignature: before.timeSignature,
+      hand: before.hand,
+      keySignature: before.keySignature,
+    })
+
+    const after = unwrap(result)
+    expect(after.workflowVersion).toBe(before.workflowVersion)
+    expect(after.notesConfirmed).toBe(true)
+    expect(after.splitConfirmed).toBe(true)
+    expect(after.setupConfirmed).toBe(before.setupConfirmed)
+  })
+
+  it('changing only a non-key field increments the version but does not clear notesConfirmed or splitConfirmed', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-34', 'thirtyfour@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-34'))
+    await confirmNotesAndSplit(db, 'user-34')
+
+    const result = await updateEtudeSetup(db, 'user-34', before.aggregateEpoch, {
+      measureCount: 20,
+      timeSignature: before.timeSignature,
+      hand: before.hand,
+      keySignature: before.keySignature,
+    })
+
+    const after = unwrap(result)
+    expect(after.measureCount).toBe(20)
+    expect(after.workflowVersion).toBe(before.workflowVersion + 1)
+    expect(after.notesConfirmed).toBe(true)
+    expect(after.splitConfirmed).toBe(true)
+  })
+
+  it('still rejects an epoch mismatch and performs no invalidation', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-35', 'thirtyfive@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-35'))
+    await confirmNotesAndSplit(db, 'user-35')
+
+    const staleEpoch = before.aggregateEpoch - 1
+    const result = await updateEtudeSetup(db, 'user-35', staleEpoch, {
+      ...validSetup,
+      keySignature: 'E minor',
+    })
+
+    expect(result.isErr).toBe(true)
+    // Reload and confirm nothing changed — no invalidation took place.
+    const reloaded = unwrap(await loadEtudeParams(db, 'user-35'))
+    expect(reloaded?.keySignature).toBe(before.keySignature)
+    expect(reloaded?.workflowVersion).toBe(before.workflowVersion)
+    expect(reloaded?.notesConfirmed).toBe(true)
+    expect(reloaded?.splitConfirmed).toBe(true)
   })
 })

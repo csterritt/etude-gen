@@ -233,6 +233,7 @@ test.describe('POST /etude/setup hostile shapes', () => {
         measures: '16',
         meter: '3/4',
         hands: 'both',
+        key: 'C major',
         workflowVersion: '1',
         foo: 'bar',
       })
@@ -261,6 +262,7 @@ test.describe('POST /etude/setup hostile shapes', () => {
           hands: 'left',
           meter: '2/4',
           measures: '12',
+          key: 'C major',
           workflowVersion: '1',
         },
         maxRedirects: 0,

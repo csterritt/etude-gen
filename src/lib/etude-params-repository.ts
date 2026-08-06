@@ -235,14 +235,46 @@ const updateEtudeSetupActual = async (
   values: ValidSetup,
 ): Promise<Result<EtudeParams, Error>> => {
   try {
+    // Load the current aggregate to compare the submitted values against
+    // the stored ones. When every submitted value is identical to the
+    // stored values, the request is a no-op: no version increment, no
+    // write, no flag changes. This avoids spurious version bumps from a
+    // double submission of the same form.
+    const current = await db
+      .select()
+      .from(etudeParams)
+      .where(eq(etudeParams.userId, userId))
+      .limit(1)
+    if (current.length === 0) {
+      // No aggregate exists for this owner; treat as a safe rejection.
+      return Result.err(new Error('epoch-mismatch'))
+    }
+    const stored = current[0]!
+    const identicalResubmit =
+      stored.measureCount === values.measureCount &&
+      stored.timeSignature === values.timeSignature &&
+      stored.hand === values.hand &&
+      stored.keySignature === values.keySignature
+    if (identicalResubmit) {
+      return Result.ok(mapToDomain(stored))
+    }
+
+    // A key change invalidates the downstream pitch-selection and split-
+    // boundary confirmation flags (Issue 11 dependency map row for Key).
+    // At this stage only the confirmation flags exist, so those are
+    // cleared. When the key is identical but another field changed, the
+    // downstream flags are left untouched.
+    const keyChanged = stored.keySignature !== values.keySignature
     const updated = await db
       .update(etudeParams)
       .set({
         measureCount: values.measureCount,
         timeSignature: values.timeSignature,
         hand: values.hand,
+        keySignature: values.keySignature,
         setupConfirmed: true,
         workflowVersion: sql`${etudeParams.workflowVersion} + 1`,
+        ...(keyChanged ? { notesConfirmed: false, splitConfirmed: false } : {}),
         updatedAt: new Date(),
       })
       .where(

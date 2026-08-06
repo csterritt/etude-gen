@@ -88,7 +88,7 @@ A catalog and summaries of all unit tests under `tests/`.
 
 ## etude-params-repository.spec.ts
 
-15 tests covering `loadOrCreateEtudeParams`, `loadEtudeParams`, and `updateEtudeSetup` from `src/lib/etude-params-repository.ts`, using the `tests/helpers/test-db.ts` real-SQLite helper:
+22 tests covering `loadOrCreateEtudeParams`, `loadEtudeParams`, and `updateEtudeSetup` from `src/lib/etude-params-repository.ts`, using the `tests/helpers/test-db.ts` real-SQLite helper:
 
 - Creates one record with the default values (8 measures, 4/4, C major, octave range 4, right hand, `workflowVersion` 1, `aggregateEpoch` 1) for a new user.
 - Does not create a second record on a second call and returns the same aggregate (idempotent).
@@ -106,15 +106,39 @@ A catalog and summaries of all unit tests under `tests/`.
 - `updateEtudeSetup` rejects when the supplied epoch no longer matches the stored epoch and persists nothing.
 - `updateEtudeSetup` returns an error and creates no row when the user owns no aggregate.
 - `updateEtudeSetup` is owner-scoped and never affects another user's aggregate.
+- `updateEtudeSetup` persists the `keySignature` value and increments the workflow version.
+- `updateEtudeSetup` clears `notesConfirmed` and `splitConfirmed` when the submitted key differs from the stored key.
+- `updateEtudeSetup` leaves `notesConfirmed` and `splitConfirmed` unchanged when the submitted key is identical to the stored key.
+- `updateEtudeSetup` does not increment the workflow version and changes no flags when all submitted values are identical to the stored ones.
+- `updateEtudeSetup` changing only a non-key field increments the version but does not clear `notesConfirmed` or `splitConfirmed`.
+- `updateEtudeSetup` still rejects an epoch mismatch and performs no invalidation.
+
+## key-domain.spec.ts
+
+21 tests covering `SUPPORTED_KEYS`, `validateKey`, and `deriveKeyPitches` from `src/lib/key-domain.ts`:
+
+- `SUPPORTED_KEYS` contains exactly the eighteen supported keys (nine major, nine natural minor), no more and no less.
+- No supported key has more than four accidentals (verified via the derived pitches).
+- `validateKey` accepts each of the eighteen supported keys and trims surrounding whitespace.
+- `validateKey` rejects an unsupported major key (B major — five sharps), an unsupported minor key (G-sharp minor — five sharps), an over-four-accidental key (D-flat major — five flats), an empty string, null, undefined, and a non-string value, each with a typed failure and never coercing to a default.
+- `deriveKeyPitches` returns exactly seven pitch names for every supported key.
+- `deriveKeyPitches` returns the exact expected pitch array for every supported key.
+- For E-flat major the derived pitches include B-flat and E-flat (not A-sharp and D-sharp).
+- For A-flat major the derived pitches include A-flat, B-flat, D-flat, and E-flat.
+- For F-sharp minor the derived pitches include F-sharp and C-sharp.
+- For C-sharp minor the derived pitches include C-sharp, D-sharp, and G-sharp.
+- For every natural-minor key the seventh scale degree is a whole step below the tonic (natural minor, not harmonic or melodic minor).
+- No supported key produces enharmonic duplicate pitch classes.
 
 ## setup-validator.spec.ts
 
-20 tests covering `validateSetup` from `src/lib/setup-validator.ts`:
+33 tests covering `validateSetup` from `src/lib/setup-validator.ts`:
 
 - Measure count: accepts boundaries 4 and 32, accepts mid-range 16, rejects 3 (below min), rejects 33 (above max), rejects decimals, rejects non-numeric strings, rejects empty string (no coercion), rejects null (no coercion), rejects undefined (no coercion).
 - Time signature: accepts 2/4, 3/4, 4/4; rejects 6/8, rejects 5/4, rejects empty string (no coercion), rejects null (no coercion).
 - Hand: accepts left, right, both; rejects unknown strings, rejects empty string (no coercion), rejects null (no coercion).
-- Multiple invalid fields: all reported together, not first-only; never throws on invalid input.
+- Key signature: accepts each of the eighteen supported keys and echoes it back; rejects an unsupported key (B major), an over-four-accidental key (G-sharp minor), an empty string (no coercion to C major), null, undefined, and a non-string value, each with a key field failure.
+- Multiple invalid fields: all reported together (including the key field), not first-only; an invalid key and an invalid measure count reported together; never throws on invalid input.
 
 ## etude-form-parser.spec.ts
 

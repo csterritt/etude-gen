@@ -53,14 +53,34 @@ A catalog and summaries of all end-to-end tests under `e2e-tests/`.
 
 ## etude/05-etude-setup-submit.spec.ts
 
-9 Playwright tests covering the `POST /etude/setup` handler from Issue 5:
+9 Playwright tests covering the `POST /etude/setup` handler from Issue 5 (updated in Issue 6 to include the key field):
 
-- A valid submission (16 measures, 3/4, both hands) redirects 303 to `/etude/setup`, persists the new values after reload, and increments the workflow version by 1.
+- A valid submission (16 measures, 3/4, both hands, C major) redirects 303 to `/etude/setup`, persists the new values after reload, and increments the workflow version by 1.
 - An out-of-range measure count (33) submitted via multipart POST (bypassing native constraints) is rejected with 303, no persistence, and no 500.
 - An unsupported meter (6/8) is rejected with 303, no persistence, and no 500.
 - An unknown hand value is rejected with 303, no persistence, and no 500.
 - An empty measures value is rejected with 303 and no 500, and is not coerced to a default.
 - An absent meter field is rejected with 303 and no 500.
 - A repeated hands field (two values via browser fetch + FormData) is rejected with 303 and no 500, never coerced.
-- An unexpected extra field is ignored and the expected fields are validated identically and accepted.
+- An unexpected extra field is ignored and the expected fields (including the key) are validated identically and accepted.
 - Fields in an arbitrary order are validated identically and accepted.
+
+## etude/06-etude-setup-key-form.spec.ts
+
+3 Playwright tests covering the `GET /etude/setup` key field and derived-pitch display from Issue 6:
+
+- Renders a key `<select>` (`data-testid="key-field"`) offering exactly the eighteen supported keys (no key with more than four accidentals), with the stored key (C major) pre-selected, an accessible label, and the seven derived pitch names displayed (`data-testid="key-pitches"`) for C major.
+- After submitting E-flat major the derived pitches show E-flat and B-flat (not A-sharp and D-sharp).
+- After submitting F-sharp minor the derived pitches contain F-sharp and C-sharp.
+
+## etude/07-etude-setup-key-submit.spec.ts
+
+7 Playwright tests covering the `POST /etude/setup` key submission from Issue 6:
+
+- A valid key submission (E-flat major) redirects 303 to `/etude/setup`, the form re-displays with the new key selected, and the derived pitches update to the new key spelling.
+- An unsupported key (B major — five sharps) submitted bypassing native constraints is rejected with 303, no persistence, and no 500.
+- An empty key value is rejected with 303, no persistence, no 500, and no silent fallback to the stored or default key.
+- A repeated key field (two values via browser fetch + FormData) is rejected with a deterministic 303 and no 500.
+- An extra unexpected field alongside a valid key does not affect the outcome for the expected fields.
+- Resubmitting the identical values (same measures, meter, hands, key as stored) does not increment the workflow version.
+- Changing only the key (from C major to A minor) increments the workflow version and the form re-displays with the new key and its derived pitches.

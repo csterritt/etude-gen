@@ -34,11 +34,12 @@ import { resolveCanonicalRoute } from '../lib/canonical-route'
 import { handleUnexpectedError } from './build-safe-error'
 import { logError, sanitizeError } from '../lib/logger'
 import { validateSetup, SUPPORTED_METERS, SUPPORTED_HANDS } from '../lib/setup-validator'
+import { SUPPORTED_KEYS, deriveKeyPitches } from '../lib/key-domain'
 import { parseParameterForm, type FieldSpec } from '../lib/etude-form-parser'
 import { redirectWithError, redirectWithMessage } from '../lib/redirects'
 
 /**
- * Field specification for the setup parameter form. The setup form has three
+ * Field specification for the setup parameter form. The setup form has four
  * expected fields and declares no repeated-field normalization, so a
  * repeated field is a reject (cross-cutting contract section 2 rule 5).
  */
@@ -47,6 +48,7 @@ const SETUP_FIELD_SPEC: FieldSpec = {
     measures: { type: 'string' },
     meter: { type: 'string' },
     hands: { type: 'string' },
+    key: { type: 'string' },
   },
 }
 
@@ -65,7 +67,7 @@ const renderEtudeSetupForm = (params: EtudeParams) => {
         <div className='card-body'>
           <h2 className='card-title text-2xl font-bold mb-4'>Set up your etude</h2>
           <p className='text-gray-600 mb-6'>
-            Choose how many measures, the time signature, and which hand or hands to practice.
+            Choose how many measures, the time signature, which hand or hands to practice, and the key.
           </p>
           <form method='post' action={PATHS.ETUDE_SETUP} data-testid='etude-setup-form'>
             <input
@@ -113,7 +115,7 @@ const renderEtudeSetupForm = (params: EtudeParams) => {
               </select>
               <p className='text-xs text-gray-500 mt-1'>Choose 2/4, 3/4, or 4/4.</p>
             </div>
-            <div className='form-control mb-6'>
+            <div className='form-control mb-4'>
               <label className='label' htmlFor='hands-field'>
                 <span className='label-text'>Hand</span>
               </label>
@@ -132,6 +134,31 @@ const renderEtudeSetupForm = (params: EtudeParams) => {
                 ))}
               </select>
               <p className='text-xs text-gray-500 mt-1'>Left hand, right hand, or both hands.</p>
+            </div>
+            <div className='form-control mb-6'>
+              <label className='label' htmlFor='key-field'>
+                <span className='label-text'>Key</span>
+              </label>
+              <select
+                id='key-field'
+                name='key'
+                required
+                value={params.keySignature}
+                data-testid='key-field'
+                className='select select-bordered w-full'
+              >
+                {SUPPORTED_KEYS.map((key) => (
+                  <option key={key} value={key} selected={key === params.keySignature}>
+                    {key}
+                  </option>
+                ))}
+              </select>
+              <p className='text-xs text-gray-500 mt-1'>
+                The seven diatonic pitches for the selected key:
+              </p>
+              <p data-testid='key-pitches' className='text-sm text-gray-700 mt-1'>
+                {deriveKeyPitches(params.keySignature).join(' ')}
+              </p>
             </div>
             <div className='card-actions justify-end'>
               <button type='submit' className='btn btn-primary' data-testid='setup-save-action'>
@@ -241,6 +268,7 @@ export const buildEtude = (app: Hono<{ Bindings: Bindings }>): void => {
         measureCount: raw.measures,
         timeSignature: raw.meter,
         hand: raw.hands,
+        keySignature: raw.key,
       })
       if (validation.isErr) {
         const firstReason = validation.error[0]?.reason ?? 'Invalid setup submission.'

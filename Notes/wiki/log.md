@@ -131,3 +131,27 @@ Modified test files:
 - `tests/etude-params-repository.spec.ts` — added 6 tests for `updateEtudeSetup` (persistence, version increment, setupConfirmed, unchanged flags, epoch mismatch, owner-scoping).
 
 Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`.
+
+## [2026-08-05] ingest | issue-006 key selection and pitch spelling
+
+Ingested the key domain catalog, pitch derivation, extended setup validator, repository key persistence and key-change invalidation, setup form key field and derived-pitch display, and POST handler key validation (issue #6).
+
+New source files:
+- `src/lib/key-domain.ts` — eighteen supported keys (nine major, nine natural minor, no more than four accidentals), `validateKey` (typed failure, no coercion), `deriveKeyPitches` (static lookup table with conventional key-signature spelling; natural minor scale for minor keys).
+
+Modified source files:
+- `src/lib/setup-validator.ts` — added `keySignature` to `ValidSetup` and `SetupInput`, added `'key'` to the `SetupValidationFailure.field` union, delegated key validation to `validateKey` from `src/lib/key-domain.ts`; `validateSetup` now validates four fields and reports all failures together.
+- `src/lib/etude-params-repository.ts` — `updateEtudeSetup` now persists `keySignature`, compares submitted values against stored values (no-op when all identical — no version increment, no write, no flag changes), and clears `notesConfirmed` and `splitConfirmed` only when the key actually changed (Issue 11 dependency map row for Key).
+- `src/routes/build-etude.tsx` — added `key` to `SETUP_FIELD_SPEC`; `renderEtudeSetupForm` now renders a key `<select>` (`data-testid="key-field"`) offering the eighteen supported keys with the stored key pre-selected, plus a derived-pitch display (`data-testid="key-pitches"`) via `deriveKeyPitches`; the POST handler passes `raw.key` as `keySignature` to `validateSetup`.
+
+New test files:
+- `tests/key-domain.spec.ts` — 21 tests for the supported-key catalog, `validateKey` (accepts all eighteen, rejects unsupported/over-four-accidental/empty/null/undefined/non-string with typed failures, no coercion), and `deriveKeyPitches` (exact pitch arrays, conventional spelling, natural-minor seventh-degree check, no enharmonic duplicates).
+- `e2e-tests/etude/06-etude-setup-key-form.spec.ts` — 3 Playwright tests for the GET form key control (eighteen options, default C major, accessible label, derived pitches) and the derived-pitch spelling after submitting E-flat major and F-sharp minor.
+- `e2e-tests/etude/07-etude-setup-key-submit.spec.ts` — 7 Playwright tests for POST key submission (valid key persistence and pitch update, unsupported/empty/repeated key rejection with 303 and no 500, extra field ignored, identical resubmit no version increment, key-only change increments version).
+
+Modified test files:
+- `tests/setup-validator.spec.ts` — extended to 33 tests covering the key field (accepts all eighteen, rejects unsupported/over-four-accidental/empty/null/undefined/non-string with key field failures, no coercion) and multi-field reporting including the key.
+- `tests/etude-params-repository.spec.ts` — extended to 22 tests covering key persistence, key-change invalidation (clears `notesConfirmed` and `splitConfirmed`), identical-key resubmit leaves flags unchanged, identical-all-fields resubmit no version increment, non-key-only change increments version but does not clear flags, epoch mismatch still rejects with no invalidation.
+- `e2e-tests/etude/05-etude-setup-submit.spec.ts` — two hostile-shape tests updated to include the `key` field in their submissions.
+
+Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`, `project-overview.md`.

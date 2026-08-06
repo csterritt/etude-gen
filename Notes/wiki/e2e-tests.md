@@ -104,3 +104,22 @@ A catalog and summaries of all end-to-end tests under `e2e-tests/`.
 - Arbitrary-order and duplicate octaves (5, 2, 5, 3, 2) are normalized to the same stored selection (2, 3, 5).
 - Changing only the octaves (from 4 to 2,3,4,5,6) increments the workflow version.
 - Resubmitting the identical values (including the same octaves) does not increment the workflow version.
+
+
+## etude/10-etude-setup-invalid-redisplay.spec.ts
+
+8 Playwright tests covering the POST invalid submission redirect and GET form redisplay from Issue 8:
+
+**POST /etude/setup invalid submission redirect:**
+
+- An invalid measures value (33) returns a 303 redirect to /etude/setup with a nonce cookie containing no submitted value, field name, or error text, and no domain state is persisted.
+- An invalid meter (6/8) returns a 303 with a nonce cookie and no persistence.
+- An empty measures value returns a 303 with a nonce cookie and no coercion to a default.
+
+**GET /etude/setup form redisplay with safe values and field errors:**
+
+- After an invalid submission, the redisplayed form shows the valid submitted values preserved and a field-level error on the offending field.
+- The stored aggregate is unchanged after an invalid submission — reload confirms measures is still the default.
+- Reloading the step a second time no longer shows the stale error or the redisplayed safe values (single-use nonce).
+- A forged or foreign nonce yields a clean step with no errors and no redisplayed values.
+- A submitted value containing HTML and quote characters is rendered escaped, not interpreted as markup.

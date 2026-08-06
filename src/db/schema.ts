@@ -133,6 +133,33 @@ export const etudeParams = sqliteTable('etude_params', {
   updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull(),
 })
 
+/**
+ * Etude validation state — short-lived, single-use, owner-scoped records that
+ * carry the safe redisplay values and field-level errors for an invalid form
+ * submission between the POST (which rejects and stores) and the GET (which
+ * consumes and redisplays).
+ *
+ * The `nonce` is an opaque, cryptographically random primary key set as an
+ * HttpOnly cookie on the 303 redirect. The `payload` is a JSON blob holding
+ * the field errors and safe redisplay values, already shaped by the
+ * safe-redisplay module so no individual value can exceed its documented byte
+ * bound. `expiresAt` is 5 minutes after `createdAt`; an expired record is
+ * unusable and indistinguishable from an unknown one. The FK cascades on user
+ * deletion so removing a user row removes their pending validation state.
+ *
+ * Physical columns are encapsulated behind the validation-state repository
+ * interface; routes and tests must not depend on them directly.
+ */
+export const etudeValidationState = sqliteTable('etude_validation_state', {
+  nonce: text('nonce').primaryKey(),
+  userId: text('userId')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  payload: text('payload').notNull(),
+  expiresAt: integer('expiresAt').notNull(),
+  createdAt: integer('createdAt').notNull(),
+})
+
 // Define schema object for export
 export const schema = {
   user,
@@ -142,6 +169,7 @@ export const schema = {
   interestedEmail,
   singleUseCode,
   etudeParams,
+  etudeValidationState,
 }
 
 export type User = typeof user.$inferSelect
@@ -159,3 +187,5 @@ export type NewInterestedEmail = typeof interestedEmail.$inferInsert
 export type NewSingleUseCode = typeof singleUseCode.$inferInsert
 export type EtudeParam = typeof etudeParams.$inferSelect
 export type NewEtudeParam = typeof etudeParams.$inferInsert
+export type EtudeValidationState = typeof etudeValidationState.$inferSelect
+export type NewEtudeValidationState = typeof etudeValidationState.$inferInsert

@@ -177,3 +177,41 @@ A catalog and summaries of all unit tests under `tests/`.
 
 - Routes to `/etude/setup` when no aggregate exists.
 - Routes to `/etude/setup` when setup is not confirmed.
+
+
+## validation-state-repository.spec.ts
+
+14 tests covering `storeValidationState` and `consumeValidationState` from `src/lib/validation-state-repository.ts`:
+
+- storeValidationState returns Result.ok with an opaque nonce and persists a record whose expiresAt is ~5 minutes after createdAt.
+- storeValidationState produces distinct nonces for distinct payloads.
+- consumeValidationState returns the stored payload for the matching nonce and owner, then deletes the record so a second consumption returns null.
+- consumeValidationState returns null for an expired record and is unusable even on first consumption.
+- consumeValidationState returns null and reveals nothing when a nonce stored for user A is presented by user B.
+- consumeValidationState returns null for an unknown nonce.
+- Size bounds: drops excess fields (more than 32 entries) rather than truncating; drops a multi-value field with more than 64 values entirely; keeps a multi-value field with exactly 64 values; drops a value exceeding 128 bytes rather than truncating; keeps a value of exactly 128 bytes; drops an error message exceeding 256 bytes rather than truncating; drops fields from the end until a total payload exceeding 16 KB is under the limit, never truncating an individual value.
+- Storage failure: returns Result.err on a simulated storage failure so the caller can fall back.
+
+## validation-state-helpers.spec.ts
+
+6 tests covering `redirectWithValidationState` and `consumeValidationStateFromRequest` from `src/lib/validation-state-helpers.ts`:
+
+- redirectWithValidationState returns a 303 with Location pointing to the redirect URL and a nonce cookie with the required attributes (HttpOnly, SameSite=Lax, Path=/etude, Max-Age=300).
+- The cookie value contains only the opaque nonce and no submitted value, field name, or error text.
+- consumeValidationStateFromRequest returns the payload for a valid nonce and sets a Set-Cookie header that deletes the nonce cookie.
+- consumeValidationStateFromRequest returns null when no nonce cookie is present.
+- consumeValidationStateFromRequest returns null identically for an unknown nonce, an expired nonce, an already-consumed nonce, and a foreign-user nonce.
+- redirectWithValidationState storage failure fallback: falls back to redirectWithError with a generic corrective message and still returns a 303, never a 500.
+
+## safe-redisplay.spec.ts
+
+16 tests covering `shapeRedisplayPayload` from `src/lib/safe-redisplay.ts`:
+
+- Basic shape checks: returns valid string values for all fields; drops non-string values; drops object values; keeps multi-value fields with valid string elements.
+- Multi-value bound: keeps 64 values; drops 65+ values entirely (not truncated to 64).
+- Value byte bound: drops values exceeding 128 bytes (not truncated); keeps exactly 128 bytes; drops a multi-value field if any element exceeds 128 bytes.
+- Error byte bound: drops error messages exceeding 256 bytes (not truncated); keeps exactly 256 bytes.
+- Total byte bound: drops fields from the end until under 16 KB, never truncating an individual value.
+- Field entry bound: drops excess fields when more than 32 entries are supplied.
+- No coercion: never coerces an invalid value into a plausible default — it is redisplayed as-is for the student to correct.
+- FieldErrors structure: each entry has a field name and message string within the 256-byte bound; the returned payload has safeValues, fieldErrors, and droppedFields properties.

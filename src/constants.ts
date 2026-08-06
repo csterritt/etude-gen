@@ -88,6 +88,12 @@ export const COOKIES = {
   // DB failure count cookie for testing // PRODUCTION:REMOVE
   DB_FAIL_COUNT: 'DB_FAIL_COUNT', // PRODUCTION:REMOVE
   DB_FAIL_INCR: 'DB_FAIL_INCR', // PRODUCTION:REMOVE
+
+  // Opaque, single-use nonce cookie carrying the key to a server-side
+  // validation-state record (Issue 8). The cookie value is only the nonce —
+  // no submitted value, field name, or error text is ever placed in it.
+  VALIDATION_STATE_NONCE: 'VALIDATION_STATE_NONCE',
+
   // Standard cookie options
   STANDARD_COOKIE_OPTIONS: {
     path: '/',
@@ -95,6 +101,21 @@ export const COOKIES = {
     sameSite: 'Strict',
     // secure: true, // PRODUCTION:UNCOMMENT
     // domain: 'mini-auth.example.com', // PRODUCTION:UNCOMMENT
+  },
+
+  // Cookie options for the validation-state nonce cookie. Path-scoped to
+  // /etude so the cookie is sent only to etude routes. SameSite=Lax so the
+  // 303 redirect from a POST carries it. Max-Age=300 (5 minutes) matches the
+  // server-side record TTL. Secure is toggled for local HTTP testing via the
+  // PRODUCTION comment convention — e2e tests run over HTTP and the browser
+  // will not send a Secure cookie over HTTP.
+  VALIDATION_STATE_COOKIE_OPTIONS: {
+    path: '/etude',
+    httpOnly: true,
+    sameSite: 'Lax',
+    // secure: true, // PRODUCTION:UNCOMMENT
+    secure: false, // PRODUCTION:REMOVE
+    maxAge: 300,
   },
 } as const
 

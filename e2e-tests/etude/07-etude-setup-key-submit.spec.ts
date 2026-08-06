@@ -78,7 +78,9 @@ test.describe('POST /etude/setup key submission', () => {
       expect(response.status()).toBe(303)
       expect(response.headers()['location']).toContain(ETUDE_SETUP_PATH)
 
-      // The stored key is unchanged (still the default C major).
+      // The stored key is unchanged (still the default C major). Clear the
+      // nonce cookie first so the validation state is not redisplayed.
+      await page.context().clearCookies({ name: 'VALIDATION_STATE_NONCE' })
       await page.goto(ETUDE_SETUP_PATH)
       await expect(page.getByTestId('key-field')).toHaveValue('C major')
     }),
@@ -104,6 +106,8 @@ test.describe('POST /etude/setup key submission', () => {
       expect(response.headers()['location']).toContain(ETUDE_SETUP_PATH)
 
       // The stored key is unchanged — the empty value was not coerced.
+      // Clear the nonce cookie so the validation state is not redisplayed.
+      await page.context().clearCookies({ name: 'VALIDATION_STATE_NONCE' })
       await page.goto(ETUDE_SETUP_PATH)
       await expect(page.getByTestId('key-field')).toHaveValue('C major')
     }),
@@ -139,6 +143,8 @@ test.describe('POST /etude/setup key submission', () => {
       expect(redirectType).toBe('opaqueredirect')
 
       // The stored key is unchanged — the repeated value was not coerced.
+      // Clear the nonce cookie so the validation state is not redisplayed.
+      await page.context().clearCookies({ name: 'VALIDATION_STATE_NONCE' })
       await page.goto(ETUDE_SETUP_PATH)
       await expect(page.getByTestId('key-field')).toHaveValue('C major')
     }),

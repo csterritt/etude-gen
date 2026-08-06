@@ -185,3 +185,8 @@ Updated test files:
 - `e2e-tests/etude/07-etude-setup-key-submit.spec.ts` — all submissions updated to include `octaves: '4'`.
 
 Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`.
+
+
+## [2026-08-06] ingest | Issue 8 — invalid submission redisplay
+
+Added wiki entries for three new source files (`safe-redisplay.ts`, `validation-state-repository.ts`, `validation-state-helpers.ts`), updated `schema.ts` and `build-etude.tsx` entries, and added unit-test and e2e-test catalog entries for the Issue 8 invalid submission redisplay feature.

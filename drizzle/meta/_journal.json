@@ -15,6 +15,13 @@
       "when": 1785980197178,
       "tag": "0001_green_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786039347958,
+      "tag": "0002_etude_validation_state",
+      "breakpoints": true
     }
   ]
 }

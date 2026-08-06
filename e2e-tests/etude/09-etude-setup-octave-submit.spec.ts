@@ -108,6 +108,8 @@ test.describe('POST /etude/setup octave submission', () => {
       expect(redirectType).toBe('opaqueredirect')
 
       // The stored octaves are unchanged (still the default octave 4).
+      // Clear the nonce cookie so the validation state is not redisplayed.
+      await page.context().clearCookies({ name: 'VALIDATION_STATE_NONCE' })
       await page.goto(ETUDE_SETUP_PATH)
       await expect(page.getByTestId('octaves-field').nth(2)).toBeChecked() // octave 4
       await expect(page.getByTestId('octaves-field').nth(4)).not.toBeChecked() // octave 6
@@ -130,6 +132,8 @@ test.describe('POST /etude/setup octave submission', () => {
       expect(response.headers()['location']).toContain(ETUDE_SETUP_PATH)
 
       // The stored octaves are unchanged (still the default octave 4).
+      // Clear the nonce cookie so the validation state is not redisplayed.
+      await page.context().clearCookies({ name: 'VALIDATION_STATE_NONCE' })
       await page.goto(ETUDE_SETUP_PATH)
       await expect(page.getByTestId('octaves-field').nth(2)).toBeChecked()
     }),

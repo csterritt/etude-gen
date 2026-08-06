@@ -38,6 +38,8 @@ import { SUPPORTED_KEYS, deriveKeyPitches } from '../lib/key-domain'
 import { OCTAVE_MIN, OCTAVE_MAX, deriveAvailablePitches } from '../lib/music-domain'
 import { parseParameterForm, type FieldSpec } from '../lib/etude-form-parser'
 import { redirectWithError, redirectWithMessage } from '../lib/redirects'
+import { shapeRedisplayPayload, type FieldError } from '../lib/safe-redisplay'
+import { redirectWithValidationState, consumeValidationStateFromRequest } from '../lib/validation-state-helpers'
 
 /**
  * Field specification for the setup parameter form. The setup form has five
@@ -72,16 +74,88 @@ const parseStoredOctaves = (stored: string): number[] => {
 }
 
 /**
+ * Optional redisplay data passed from the GET handler when a validation-state
+ * record was consumed. `safeValues` override the committed aggregate values
+ * for fields that have a safe redisplay value; `fieldErrors` are rendered
+ * near each offending field with `data-testid='<field>-error'`; `droppedFields`
+ * are fields that were removed by a bound and must use the committed aggregate
+ * value instead.
+ */
+interface RedisplayData {
+  safeValues: Record<string, string | string[]>
+  fieldErrors: FieldError[]
+  droppedFields: string[]
+}
+
+/**
+ * Look up the field-level error message for a field, if any.
+ */
+const errorForField = (errors: FieldError[], field: string): string | null => {
+  for (const e of errors) {
+    if (e.field === field) {
+      return e.message
+    }
+  }
+  return null
+}
+
+/**
+ * Render a field-level error element with `data-testid='<field>-error'` and
+ * `aria-describedby` wiring. The full accessible error summary and focus
+ * management is Issue 9's scope — this issue renders the field-level error
+ * text and the data attributes Issue 9 will wire. Returns null when there is
+ * no error for the field.
+ */
+const renderFieldError = (field: string, message: string) => {
+  return (
+    <p
+      data-testid={`${field}-error`}
+      className='text-xs text-error mt-1'
+      id={`${field}-error`}
+      role='alert'
+    >
+      {message}
+    </p>
+  )
+}
+
+/**
  * Render the JSX for the setup-step form pre-populated with the saved
- * aggregate's values. Every control has an accessible label and native HTML
+ * aggregate's values, or with safe redisplay values when a validation-state
+ * record was consumed. Every control has an accessible label and native HTML
  * constraints, with independent server enforcement behind them. The hidden
  * `workflowVersion` field carries the current version for compare-and-set
  * (Issue 10 wires the stale-version rejection; this issue emits the field
  * and increments on success).
+ *
+ * When `redisplay` is provided, for each field: if a safe value is present in
+ * `safeValues`, use it to populate the form control's `value` attribute
+ * instead of the committed aggregate value; if the field is in
+ * `droppedFields`, use the committed aggregate value. For each field with an
+ * error in `fieldErrors`, render an error element with
+ * `data-testid='<field>-error'`. TSX contextual encoding automatically
+ * escapes redisplayed values — no manual sanitization or markup stripping.
  */
-const renderEtudeSetupForm = (params: EtudeParams) => {
-  const selectedOctaves = parseStoredOctaves(params.selectedOctaves)
-  const availablePitches = deriveAvailablePitches(params.keySignature, selectedOctaves)
+const renderEtudeSetupForm = (params: EtudeParams, redisplay?: RedisplayData) => {
+  const safeValues = redisplay?.safeValues ?? {}
+  const fieldErrors = redisplay?.fieldErrors ?? []
+  // Resolve the effective value for each field: a safe redisplay value if
+  // present, otherwise the committed aggregate value.
+  const measuresValue =
+    typeof safeValues.measures === 'string' ? safeValues.measures : String(params.measureCount)
+  const meterValue =
+    typeof safeValues.meter === 'string' ? safeValues.meter : params.timeSignature
+  const handsValue =
+    typeof safeValues.hands === 'string' ? safeValues.hands : params.hand
+  const keyValue =
+    typeof safeValues.key === 'string' ? safeValues.key : params.keySignature
+  // Octaves: use the safe redisplay array if present, otherwise the committed
+  // aggregate's parsed octaves.
+  const redisplayOctaves = Array.isArray(safeValues.octaves)
+    ? safeValues.octaves.map(Number).filter((n) => Number.isInteger(n))
+    : null
+  const selectedOctaves = redisplayOctaves ?? parseStoredOctaves(params.selectedOctaves)
+  const availablePitches = deriveAvailablePitches(keyValue, selectedOctaves)
   return (
     <div data-testid='etude-setup-banner' className='flex justify-center'>
       <div className='card w-full max-w-md bg-base-100 shadow-xl'>
@@ -110,11 +184,14 @@ const renderEtudeSetupForm = (params: EtudeParams) => {
                 max='32'
                 step='1'
                 required
-                value={String(params.measureCount)}
+                value={measuresValue}
+                aria-describedby={errorForField(fieldErrors, 'measures') ? 'measures-error' : undefined}
                 data-testid='measures-field'
                 className='input input-bordered w-full'
               />
               <p className='text-xs text-gray-500 mt-1'>Between 4 and 32 measures.</p>
+              {errorForField(fieldErrors, 'measures') !== null &&
+                renderFieldError('measures', errorForField(fieldErrors, 'measures')!)}
             </div>
             <div className='form-control mb-4'>
               <label className='label' htmlFor='meter-field'>
@@ -124,17 +201,20 @@ const renderEtudeSetupForm = (params: EtudeParams) => {
                 id='meter-field'
                 name='meter'
                 required
-                value={params.timeSignature}
+                value={meterValue}
+                aria-describedby={errorForField(fieldErrors, 'meter') ? 'meter-error' : undefined}
                 data-testid='meter-field'
                 className='select select-bordered w-full'
               >
                 {SUPPORTED_METERS.map((meter) => (
-                  <option key={meter} value={meter} selected={meter === params.timeSignature}>
+                  <option key={meter} value={meter} selected={meter === meterValue}>
                     {meter}
                   </option>
                 ))}
               </select>
               <p className='text-xs text-gray-500 mt-1'>Choose 2/4, 3/4, or 4/4.</p>
+              {errorForField(fieldErrors, 'meter') !== null &&
+                renderFieldError('meter', errorForField(fieldErrors, 'meter')!)}
             </div>
             <div className='form-control mb-4'>
               <label className='label' htmlFor='hands-field'>
@@ -144,17 +224,20 @@ const renderEtudeSetupForm = (params: EtudeParams) => {
                 id='hands-field'
                 name='hands'
                 required
-                value={params.hand}
+                value={handsValue}
+                aria-describedby={errorForField(fieldErrors, 'hands') ? 'hands-error' : undefined}
                 data-testid='hands-field'
                 className='select select-bordered w-full'
               >
                 {SUPPORTED_HANDS.map((hand) => (
-                  <option key={hand} value={hand} selected={hand === params.hand}>
+                  <option key={hand} value={hand} selected={hand === handsValue}>
                     {hand}
                   </option>
                 ))}
               </select>
               <p className='text-xs text-gray-500 mt-1'>Left hand, right hand, or both hands.</p>
+              {errorForField(fieldErrors, 'hands') !== null &&
+                renderFieldError('hands', errorForField(fieldErrors, 'hands')!)}
             </div>
             <div className='form-control mb-6'>
               <label className='label' htmlFor='key-field'>
@@ -164,12 +247,13 @@ const renderEtudeSetupForm = (params: EtudeParams) => {
                 id='key-field'
                 name='key'
                 required
-                value={params.keySignature}
+                value={keyValue}
+                aria-describedby={errorForField(fieldErrors, 'key') ? 'key-error' : undefined}
                 data-testid='key-field'
                 className='select select-bordered w-full'
               >
                 {SUPPORTED_KEYS.map((key) => (
-                  <option key={key} value={key} selected={key === params.keySignature}>
+                  <option key={key} value={key} selected={key === keyValue}>
                     {key}
                   </option>
                 ))}
@@ -178,8 +262,10 @@ const renderEtudeSetupForm = (params: EtudeParams) => {
                 The seven diatonic pitches for the selected key:
               </p>
               <p data-testid='key-pitches' className='text-sm text-gray-700 mt-1'>
-                {deriveKeyPitches(params.keySignature).join(' ')}
+                {deriveKeyPitches(keyValue).join(' ')}
               </p>
+              {errorForField(fieldErrors, 'key') !== null &&
+                renderFieldError('key', errorForField(fieldErrors, 'key')!)}
             </div>
             <div className='form-control mb-6'>
               <span className='label-text mb-2'>Octaves</span>
@@ -207,6 +293,8 @@ const renderEtudeSetupForm = (params: EtudeParams) => {
               <p data-testid='available-range' className='text-xs text-gray-500 mt-2'>
                 Available range: {availablePitches.lowest} to {availablePitches.highest}
               </p>
+              {errorForField(fieldErrors, 'octaves') !== null &&
+                renderFieldError('octaves', errorForField(fieldErrors, 'octaves')!)}
             </div>
             <div className='card-actions justify-end'>
               <button type='submit' className='btn btn-primary' data-testid='setup-save-action'>
@@ -274,7 +362,32 @@ export const buildEtude = (app: Hono<{ Bindings: Bindings }>): void => {
         return redirectWithMessage(c, PATHS.ETUDE, '')
       }
 
-      return c.render(useLayout(c, renderEtudeSetupForm(result.value)))
+      // Consume any pending validation-state record from a rejected POST.
+      // The nonce is single-use; an unknown/expired/foreign nonce yields null
+      // identically. When a payload is present, its safeValues override the
+      // committed aggregate values for redisplay, and its fieldErrors are
+      // rendered near each offending field.
+      let redisplay: { safeValues: Record<string, string | string[]>; fieldErrors: FieldError[]; droppedFields: string[] } | undefined
+      try {
+        const redisplayResult = await consumeValidationStateFromRequest(
+          c as unknown as Context<AppEnv>,
+          db,
+          user.id,
+        )
+        redisplay =
+          redisplayResult.isOk && redisplayResult.value !== null
+            ? {
+                safeValues: redisplayResult.value.safeValues,
+                fieldErrors: redisplayResult.value.fieldErrors,
+                droppedFields: redisplayResult.value.droppedFields,
+              }
+            : undefined
+      } catch (err) {
+        logError('consume validation state failed', { error: sanitizeError(err as Error) })
+        redisplay = undefined
+      }
+
+      return c.render(useLayout(c, renderEtudeSetupForm(result.value, redisplay)))
     },
   )
 
@@ -307,8 +420,16 @@ export const buildEtude = (app: Hono<{ Bindings: Bindings }>): void => {
       }
       const parseResult = parseParameterForm(form, SETUP_FIELD_SPEC)
       if (parseResult.isErr) {
-        const firstReason = parseResult.error[0]?.reason ?? 'Invalid setup submission.'
-        return redirectWithError(c, PATHS.ETUDE_SETUP, firstReason)
+        // Collect the parse failures as field-addressable errors and the
+        // raw values that were parseable (an empty record if parsing failed
+        // entirely). Shape the redisplay payload (drop-not-truncate bounds)
+        // and store it server-side with a nonce cookie redirect.
+        const fieldErrors: FieldError[] = parseResult.error.map((f) => ({
+          field: f.field,
+          message: f.reason,
+        }))
+        const shaped = shapeRedisplayPayload({}, fieldErrors)
+        return redirectWithValidationState(c, PATHS.ETUDE_SETUP, db, user.id, shaped)
       }
 
       const raw = parseResult.value
@@ -320,8 +441,17 @@ export const buildEtude = (app: Hono<{ Bindings: Bindings }>): void => {
         octaves: raw.octaves,
       })
       if (validation.isErr) {
-        const firstReason = validation.error[0]?.reason ?? 'Invalid setup submission.'
-        return redirectWithError(c, PATHS.ETUDE_SETUP, firstReason)
+        // Pass the raw string/string[] values from the parser and the
+        // validation failures to the shaping module, then store the payload
+        // server-side with a nonce cookie redirect. The shaping module
+        // applies its own bounds; the raw values are the string/string[]
+        // values, not the typed domain values.
+        const fieldErrors: FieldError[] = validation.error.map((f) => ({
+          field: f.field,
+          message: f.reason,
+        }))
+        const shaped = shapeRedisplayPayload(raw, fieldErrors)
+        return redirectWithValidationState(c, PATHS.ETUDE_SETUP, db, user.id, shaped)
       }
 
       // Load the current aggregate to obtain the current epoch for the

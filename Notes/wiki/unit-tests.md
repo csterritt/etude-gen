@@ -215,3 +215,23 @@ A catalog and summaries of all unit tests under `tests/`.
 - Field entry bound: drops excess fields when more than 32 entries are supplied.
 - No coercion: never coerces an invalid value into a plausible default — it is redisplayed as-is for the student to correct.
 - FieldErrors structure: each entry has a field name and message string within the 256-byte bound; the returned payload has safeValues, fieldErrors, and droppedFields properties.
+
+## error-summary.spec.ts
+
+11 tests covering `buildErrorSummaryEntries` from `src/components/error-summary.tsx`:
+
+- Basic behavior: produces one entry per field error with the field's control id as the link target and the error message as the link text; produces no entries when there are no field errors.
+- Multi-error and dedupe rules: produces two entries with unique anchor ids for a field with two distinct errors; emits duplicate error text for the same field only once; keeps distinct messages for the same field while deduping identical ones.
+- Field ordering: orders entries by the order the fields appear in `fieldOrder`, not by error array order; preserves the per-field error order within a single field; places a field not in `fieldOrder` at the end in error-array order.
+- Group-level errors: routes a group field error to the group first member control id and marks it as a group error; routes a non-group field error to the field control id and marks it as not a group error; gives each error in a group field a unique anchor id.
+- Anchor uniqueness across fields: produces unique anchor ids across multiple fields.
+
+## error-summary-focus.spec.ts
+
+6 tests covering `buildErrorSummaryFocusScript` from `src/lib/error-summary-focus.ts`:
+
+- Returns a string beginning with `<script` and ending with `</script>`.
+- Interpolates the given id into `getElementById`, not a hardcoded value.
+- Contains a `.focus()` call on the resolved element.
+- Guards against the element being null or undefined so it cannot throw (the `.focus()` call is inside an `if` guard).
+- Does not reference any field name, submitted value, or error text — only the summary id.

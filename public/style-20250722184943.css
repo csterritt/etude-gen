@@ -3454,6 +3454,14 @@
     }
   }
   @layer daisyui.l1.l2.l3 {
+    .fieldset {
+      display: grid;
+      gap: calc(0.25rem * 1.5);
+      padding-block: 0.25rem;
+      font-size: 0.75rem;
+      grid-template-columns: 1fr;
+      grid-auto-rows: max-content;
+    }
     .chat {
       display: grid;
       grid-auto-rows: min-content;
@@ -3622,6 +3630,9 @@
   }
   .list-inside {
     list-style-position: inside;
+  }
+  .list-decimal {
+    list-style-type: decimal;
   }
   .list-disc {
     list-style-type: disc;

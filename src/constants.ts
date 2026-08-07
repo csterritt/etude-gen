@@ -254,8 +254,15 @@ export const ALLOW_SCRIPTS_SECURE_HEADERS: SecureHeadersConfig = {
   contentSecurityPolicy: {
     ...STANDARD_SECURE_HEADERS.contentSecurityPolicy,
     sandbox: ['allow-same-origin', 'allow-scripts', 'allow-forms'],
-    // Allow service worker registration script in renderer
-    scriptSrc: ["'self'", "'sha256-Asl+hSRidxWRtKpu19jWjIcBvpFh6jTQGDIPAHY4Ilk='"],
+    // Allow service worker registration script in renderer, and the
+    // error-summary focus-on-load inline script from Issue 9. The hash is
+    // the SHA-256 of the script content produced by
+    // `buildErrorSummaryFocusScript('error-summary')`.
+    scriptSrc: [
+      "'self'",
+      "'sha256-Asl+hSRidxWRtKpu19jWjIcBvpFh6jTQGDIPAHY4Ilk='",
+      "'sha256-LhqI/1sAI5+J4Ck9IJfPbZ4BAV+YPZtMHTFaEWBt81Q='",
+    ],
   },
 }
 

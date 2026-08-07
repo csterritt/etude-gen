@@ -23,8 +23,9 @@
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 import { secureHeaders } from 'hono/secure-headers'
+import { raw } from 'hono/utils/html'
 
-import { PATHS, STANDARD_SECURE_HEADERS } from '../constants'
+import { PATHS, STANDARD_SECURE_HEADERS, ALLOW_SCRIPTS_SECURE_HEADERS } from '../constants'
 import { Bindings, type AppEnv, type AuthUser, type DrizzleClient } from '../local-types'
 import { useLayout } from './build-layout'
 import { signedInAccess } from '../middleware/signed-in-access'
@@ -40,6 +41,8 @@ import { parseParameterForm, type FieldSpec } from '../lib/etude-form-parser'
 import { redirectWithError, redirectWithMessage } from '../lib/redirects'
 import { shapeRedisplayPayload, type FieldError } from '../lib/safe-redisplay'
 import { redirectWithValidationState, consumeValidationStateFromRequest } from '../lib/validation-state-helpers'
+import { ErrorSummary, buildErrorSummaryEntries, type ErrorSummaryEntry } from '../components/error-summary'
+import { buildErrorSummaryFocusScript } from '../lib/error-summary-focus'
 
 /**
  * Field specification for the setup parameter form. The setup form has five
@@ -57,6 +60,24 @@ const SETUP_FIELD_SPEC: FieldSpec = {
     key: { type: 'string' },
     octaves: { type: 'string-multi' },
   },
+}
+
+/**
+ * Field order for the setup form, used by `buildErrorSummaryEntries` to order
+ * summary entries by the fields' visual appearance. Defined once here so the
+ * route and any tests share a single source of truth.
+ */
+const SETUP_FIELD_ORDER = ['measures', 'meter', 'hands', 'key', 'octaves'] as const
+
+/**
+ * Group-field configuration for the setup form. The `octaves` field is a
+ * multi-value group whose first member control is `octaves-field-2` (the
+ * lowest octave checkbox). A group-level error links to that first member so
+ * activating it moves focus into the group, and the error is associated with
+ * the group container (the `<fieldset>`) rather than a single checkbox.
+ */
+const SETUP_GROUP_FIELDS = {
+  octaves: { firstMemberId: 'octaves-field-2' },
 }
 
 /**
@@ -88,35 +109,50 @@ interface RedisplayData {
 }
 
 /**
- * Look up the field-level error message for a field, if any.
+ * Return the error-summary entries that belong to a single field. Entries are
+ * matched by the `anchorId` prefix `<field>-error-`.
  */
-const errorForField = (errors: FieldError[], field: string): string | null => {
-  for (const e of errors) {
-    if (e.field === field) {
-      return e.message
-    }
-  }
-  return null
+const entriesForField = (entries: ErrorSummaryEntry[], field: string): ErrorSummaryEntry[] =>
+  entries.filter((e) => e.anchorId.startsWith(`${field}-error-`))
+
+/**
+ * Build the `aria-describedby` value for a control: always includes the
+ * instructions id, plus the anchor id of each error entry for the field (so
+ * the control is programmatically associated with its instructions and its
+ * field-level errors).
+ */
+const describedByFor = (
+  entries: ErrorSummaryEntry[],
+  field: string,
+  instructionsId: string,
+): string => {
+  const errorIds = entriesForField(entries, field).map((e) => e.anchorId)
+  return [instructionsId, ...errorIds].join(' ')
 }
 
 /**
- * Render a field-level error element with `data-testid='<field>-error'` and
- * `aria-describedby` wiring. The full accessible error summary and focus
- * management is Issue 9's scope — this issue renders the field-level error
- * text and the data attributes Issue 9 will wire. Returns null when there is
- * no error for the field.
+ * Render the field-level error elements for a single field. Each error gets a
+ * unique id matching its summary entry's `anchorId` (e.g. `measures-error-0`,
+ * `measures-error-1`) so the control's `aria-describedby` can reference it
+ * precisely. The `data-testid` stays as `<field>-error` for test discovery.
+ * Returns null when there are no errors for the field.
  */
-const renderFieldError = (field: string, message: string) => {
-  return (
+const renderFieldErrors = (entries: ErrorSummaryEntry[], field: string) => {
+  const fieldEntries = entriesForField(entries, field)
+  if (fieldEntries.length === 0) {
+    return null
+  }
+  return fieldEntries.map((entry) => (
     <p
+      key={entry.anchorId}
       data-testid={`${field}-error`}
       className='text-xs text-error mt-1'
-      id={`${field}-error`}
+      id={entry.anchorId}
       role='alert'
     >
-      {message}
+      {entry.text}
     </p>
-  )
+  ))
 }
 
 /**
@@ -139,6 +175,14 @@ const renderFieldError = (field: string, message: string) => {
 const renderEtudeSetupForm = (params: EtudeParams, redisplay?: RedisplayData) => {
   const safeValues = redisplay?.safeValues ?? {}
   const fieldErrors = redisplay?.fieldErrors ?? []
+  // Build the error-summary entries once so the summary, the field-level
+  // error elements, and the aria-describedby wiring all share the same
+  // unique anchor ids. Entries is empty when there are no field errors.
+  const entries = buildErrorSummaryEntries(
+    fieldErrors,
+    [...SETUP_FIELD_ORDER],
+    SETUP_GROUP_FIELDS,
+  )
   // Resolve the effective value for each field: a safe redisplay value if
   // present, otherwise the committed aggregate value.
   const measuresValue =
@@ -164,6 +208,8 @@ const renderEtudeSetupForm = (params: EtudeParams, redisplay?: RedisplayData) =>
           <p className='text-gray-600 mb-6'>
             Choose how many measures, the time signature, which hand or hands to practice, and the key.
           </p>
+          {entries.length > 0 && <ErrorSummary entries={entries} />}
+          {entries.length > 0 && raw(buildErrorSummaryFocusScript('error-summary'))}
           <form method='post' action={PATHS.ETUDE_SETUP} data-testid='etude-setup-form'>
             <input
               type='hidden'
@@ -185,13 +231,14 @@ const renderEtudeSetupForm = (params: EtudeParams, redisplay?: RedisplayData) =>
                 step='1'
                 required
                 value={measuresValue}
-                aria-describedby={errorForField(fieldErrors, 'measures') ? 'measures-error' : undefined}
+                aria-describedby={describedByFor(entries, 'measures', 'measures-instructions')}
                 data-testid='measures-field'
                 className='input input-bordered w-full'
               />
-              <p className='text-xs text-gray-500 mt-1'>Between 4 and 32 measures.</p>
-              {errorForField(fieldErrors, 'measures') !== null &&
-                renderFieldError('measures', errorForField(fieldErrors, 'measures')!)}
+              <p id='measures-instructions' className='text-xs text-gray-500 mt-1'>
+                Between 4 and 32 measures.
+              </p>
+              {renderFieldErrors(entries, 'measures')}
             </div>
             <div className='form-control mb-4'>
               <label className='label' htmlFor='meter-field'>
@@ -202,7 +249,7 @@ const renderEtudeSetupForm = (params: EtudeParams, redisplay?: RedisplayData) =>
                 name='meter'
                 required
                 value={meterValue}
-                aria-describedby={errorForField(fieldErrors, 'meter') ? 'meter-error' : undefined}
+                aria-describedby={describedByFor(entries, 'meter', 'meter-instructions')}
                 data-testid='meter-field'
                 className='select select-bordered w-full'
               >
@@ -212,9 +259,10 @@ const renderEtudeSetupForm = (params: EtudeParams, redisplay?: RedisplayData) =>
                   </option>
                 ))}
               </select>
-              <p className='text-xs text-gray-500 mt-1'>Choose 2/4, 3/4, or 4/4.</p>
-              {errorForField(fieldErrors, 'meter') !== null &&
-                renderFieldError('meter', errorForField(fieldErrors, 'meter')!)}
+              <p id='meter-instructions' className='text-xs text-gray-500 mt-1'>
+                Choose 2/4, 3/4, or 4/4.
+              </p>
+              {renderFieldErrors(entries, 'meter')}
             </div>
             <div className='form-control mb-4'>
               <label className='label' htmlFor='hands-field'>
@@ -225,7 +273,7 @@ const renderEtudeSetupForm = (params: EtudeParams, redisplay?: RedisplayData) =>
                 name='hands'
                 required
                 value={handsValue}
-                aria-describedby={errorForField(fieldErrors, 'hands') ? 'hands-error' : undefined}
+                aria-describedby={describedByFor(entries, 'hands', 'hands-instructions')}
                 data-testid='hands-field'
                 className='select select-bordered w-full'
               >
@@ -235,9 +283,10 @@ const renderEtudeSetupForm = (params: EtudeParams, redisplay?: RedisplayData) =>
                   </option>
                 ))}
               </select>
-              <p className='text-xs text-gray-500 mt-1'>Left hand, right hand, or both hands.</p>
-              {errorForField(fieldErrors, 'hands') !== null &&
-                renderFieldError('hands', errorForField(fieldErrors, 'hands')!)}
+              <p id='hands-instructions' className='text-xs text-gray-500 mt-1'>
+                Left hand, right hand, or both hands.
+              </p>
+              {renderFieldErrors(entries, 'hands')}
             </div>
             <div className='form-control mb-6'>
               <label className='label' htmlFor='key-field'>
@@ -248,7 +297,7 @@ const renderEtudeSetupForm = (params: EtudeParams, redisplay?: RedisplayData) =>
                 name='key'
                 required
                 value={keyValue}
-                aria-describedby={errorForField(fieldErrors, 'key') ? 'key-error' : undefined}
+                aria-describedby={describedByFor(entries, 'key', 'key-instructions')}
                 data-testid='key-field'
                 className='select select-bordered w-full'
               >
@@ -258,18 +307,22 @@ const renderEtudeSetupForm = (params: EtudeParams, redisplay?: RedisplayData) =>
                   </option>
                 ))}
               </select>
-              <p className='text-xs text-gray-500 mt-1'>
+              <p id='key-instructions' className='text-xs text-gray-500 mt-1'>
                 The seven diatonic pitches for the selected key:
               </p>
               <p data-testid='key-pitches' className='text-sm text-gray-700 mt-1'>
                 {deriveKeyPitches(keyValue).join(' ')}
               </p>
-              {errorForField(fieldErrors, 'key') !== null &&
-                renderFieldError('key', errorForField(fieldErrors, 'key')!)}
+              {renderFieldErrors(entries, 'key')}
             </div>
-            <div className='form-control mb-6'>
-              <span className='label-text mb-2'>Octaves</span>
-              <p className='text-xs text-gray-500 mt-1'>Select one or more octaves from 2 through 6.</p>
+            <fieldset
+              className='form-control mb-6'
+              aria-describedby={describedByFor(entries, 'octaves', 'octaves-instructions')}
+            >
+              <legend className='label-text mb-2'>Octaves</legend>
+              <p id='octaves-instructions' className='text-xs text-gray-500 mt-1'>
+                Select one or more octaves from 2 through 6.
+              </p>
               <div className='flex flex-col gap-1 mt-2'>
                 {Array.from({ length: OCTAVE_MAX - OCTAVE_MIN + 1 }, (_, i) => {
                   const octave = OCTAVE_MIN + i
@@ -293,9 +346,8 @@ const renderEtudeSetupForm = (params: EtudeParams, redisplay?: RedisplayData) =>
               <p data-testid='available-range' className='text-xs text-gray-500 mt-2'>
                 Available range: {availablePitches.lowest} to {availablePitches.highest}
               </p>
-              {errorForField(fieldErrors, 'octaves') !== null &&
-                renderFieldError('octaves', errorForField(fieldErrors, 'octaves')!)}
-            </div>
+              {renderFieldErrors(entries, 'octaves')}
+            </fieldset>
             <div className='card-actions justify-end'>
               <button type='submit' className='btn btn-primary' data-testid='setup-save-action'>
                 Save setup
@@ -339,7 +391,7 @@ export const buildEtude = (app: Hono<{ Bindings: Bindings }>): void => {
 
   app.get(
     PATHS.ETUDE_SETUP,
-    secureHeaders(STANDARD_SECURE_HEADERS),
+    secureHeaders(ALLOW_SCRIPTS_SECURE_HEADERS),
     signedInAccess,
     async (c: Context) => {
       const user = c.get('user') as AuthUser | null | undefined

@@ -190,3 +190,19 @@ Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`.
 ## [2026-08-06] ingest | Issue 8 — invalid submission redisplay
 
 Added wiki entries for three new source files (`safe-redisplay.ts`, `validation-state-repository.ts`, `validation-state-helpers.ts`), updated `schema.ts` and `build-etude.tsx` entries, and added unit-test and e2e-test catalog entries for the Issue 8 invalid submission redisplay feature.
+
+
+## [2026-08-07] ingest | Issue 9 — form accessibility error summary
+
+Added wiki entries for two new source files (`src/components/error-summary.tsx`, `src/lib/error-summary-focus.ts`), updated the `build-etude.tsx` entry to reflect the Issue 9 changes (accessible error summary, focus-on-load script, instruction association, unique error ids, octaves fieldset, `ALLOW_SCRIPTS_SECURE_HEADERS`), and added unit-test and e2e-test catalog entries for the Issue 9 form accessibility error summary feature.
+
+New source files:
+- `src/components/error-summary.tsx` — shared accessible error-summary component and `buildErrorSummaryEntries` pure entry-builder.
+- `src/lib/error-summary-focus.ts` — focus-on-load inline script builder.
+
+New test files:
+- `tests/error-summary.spec.ts` — 11 tests covering entry building, multi-error dedupe, field ordering, group-level errors, and anchor uniqueness.
+- `tests/error-summary-focus.spec.ts` — 6 tests covering script shape, id interpolation, focus call, null guards, and content safety.
+- `e2e-tests/etude/11-etude-setup-error-summary.spec.ts` — 10 Playwright tests covering error summary focus, link targets, form accessibility, native constraints, aria-describedby wiring, unique anchor ids, group-level errors, id uniqueness, no-summary-when-valid, and multi-error ordering.
+
+Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`.

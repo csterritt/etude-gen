@@ -123,3 +123,26 @@ A catalog and summaries of all end-to-end tests under `e2e-tests/`.
 - Reloading the step a second time no longer shows the stale error or the redisplayed safe values (single-use nonce).
 - A forged or foreign nonce yields a clean step with no errors and no redisplayed values.
 - A submitted value containing HTML and quote characters is rendered escaped, not interpreted as markup.
+
+## etude/11-etude-setup-error-summary.spec.ts
+
+10 Playwright tests covering the accessible error summary and form accessibility from Issue 9:
+
+**Error summary and focus:**
+
+- After an invalid submission, the error summary receives programmatic focus on load (the inline focus script moves focus to the `#error-summary` element).
+- Each summary entry is a link whose `href` resolves to an existing control, and following it moves focus to the linked control.
+
+**Form accessibility:**
+
+- Every form control has an accessible name (label or aria-label): measures, time signature, hand, key, and each octave checkbox ("Octave N"); the octaves group is a `<fieldset>` with a `<legend>` resolvable as a group.
+- Bounded fields carry native HTML constraint attributes (min/max/step/required on measures; required on selects).
+- Each field-level error element is programmatically associated with its control via `aria-describedby` (referencing the unique `<field>-error-<index>` id).
+- A field error summary entry uses the unique anchor pattern `<field>-error-<index>` that supports multiple errors per field.
+- A group-level octaves error targets the first octave checkbox (`octaves-field-2`) and is associated with the group via `aria-describedby` on the fieldset.
+- All control ids on the page are unique.
+
+**Edge cases:**
+
+- No error summary element renders when the submission is valid (clean step).
+- Multiple invalid fields each produce a summary entry, and the entries are ordered by field appearance (measures before meter).

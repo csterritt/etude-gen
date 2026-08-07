@@ -56,6 +56,7 @@ import { testSignUpModeRouter } from './routes/test/sign-up-mode' // PRODUCTION:
 import { testSmtpRouter } from './routes/test/smtp-config' // PRODUCTION:REMOVE
 import { testForcedErrorRouter } from './routes/test/forced-error' // PRODUCTION:REMOVE
 import { handleEtudeOperationPrecondition } from './routes/test/etude-operation-precondition' // PRODUCTION:REMOVE
+import { handleEtudeDownstreamState } from './routes/test/etude-downstream-state' // PRODUCTION:REMOVE
 import { isTestRouteEnabled } from './lib/test-routes'
 
 /**
@@ -230,6 +231,7 @@ if (isTestRouteEnabledFlag) {
   app.route('/test', testSmtpRouter) // PRODUCTION:REMOVE
   app.route('/test', testForcedErrorRouter) // PRODUCTION:REMOVE
   handleEtudeOperationPrecondition(app) // PRODUCTION:REMOVE
+  handleEtudeDownstreamState(app) // PRODUCTION:REMOVE
 }
 
 // this MUST be the last route declared!

@@ -129,6 +129,14 @@ export const etudeParams = sqliteTable('etude_params', {
   setupConfirmed: integer('setupConfirmed', { mode: 'boolean' }).default(false).notNull(),
   notesConfirmed: integer('notesConfirmed', { mode: 'boolean' }).default(false).notNull(),
   splitConfirmed: integer('splitConfirmed', { mode: 'boolean' }).default(false).notNull(),
+  // Downstream selection data written by the notes and split steps (Issues 13,
+  // 14, 16). Nullable with no default because those steps arrive in later
+  // slices — at this stage they are always null until a step (or a test) writes
+  // them. Issue 11's dependent-downstream invalidation clears these to null in
+  // the same committed transition as the upstream change.
+  selectedPitches: text('selectedPitches'),
+  selectedDurations: text('selectedDurations'),
+  splitBoundary: text('splitBoundary'),
   createdAt: integer('createdAt', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull(),
 })

@@ -88,7 +88,7 @@ A catalog and summaries of all unit tests under `tests/`.
 
 ## etude-params-repository.spec.ts
 
-33 tests covering `loadOrCreateEtudeParams`, `loadEtudeParams`, and `updateEtudeSetup` from `src/lib/etude-params-repository.ts`, using the `tests/helpers/test-db.ts` real-SQLite helper:
+44 tests covering `loadOrCreateEtudeParams`, `loadEtudeParams`, and `updateEtudeSetup` from `src/lib/etude-params-repository.ts`, using the `tests/helpers/test-db.ts` real-SQLite helper:
 
 - Creates one record with the default values (8 measures, 4/4, C major, selected octaves `'4'`, octave range 4, right hand, `workflowVersion` 1, `aggregateEpoch` 1) for a new user.
 - Does not create a second record on a second call and returns the same aggregate (idempotent).
@@ -123,6 +123,42 @@ A catalog and summaries of all unit tests under `tests/`.
 - `updateEtudeSetup` rejects with a typed `version-mismatch` when the expected version is newer than the stored version and persists nothing.
 - `updateEtudeSetup` rejects at most one of two concurrent `Promise.all` updates with the same expected version (the loser gets a typed `version-mismatch`).
 - `updateEtudeSetup` rejects an identical resubmit with a stale version as a `version-mismatch` (no silent success on a stale token).
+- `updateEtudeSetup` clears `selectedPitches` and `splitBoundary` (not `selectedDurations`) when the key changes (Issue 11 full dependency map).
+- `updateEtudeSetup` clears `selectedPitches` and `splitBoundary` (not `selectedDurations`) when only the octaves change (Issue 11).
+- `updateEtudeSetup` clears `selectedDurations` (not pitches or split) when the meter changes (Issue 11).
+- `updateEtudeSetup` retains all downstream state when only the measure count changes (Issue 11 — measure count is not in the dependency map).
+- `updateEtudeSetup` clears `splitBoundary` and unconfirms notes when switching to both hands with fewer than two stored pitches (Issue 11 two-hand revalidation).
+- `updateEtudeSetup` clears `splitBoundary` but keeps notes confirmed when switching to both hands with two or more stored pitches (Issue 11).
+- `updateEtudeSetup` clears `splitBoundary` but keeps notes confirmed when switching to one hand (Issue 11).
+- `updateEtudeSetup` clears the union of dependents (pitches, durations, split) when key and meter both change in one submission, incrementing the version exactly once (Issue 11).
+- `updateEtudeSetup` retains all downstream state on an identical resubmit (Issue 11).
+- `updateEtudeSetup` rejects a stale version alongside upstream changes before any invalidation takes place (Issue 11 — CAS rejects first).
+- `updateEtudeSetup` returns a `db-error` and persists nothing when the invalidating write throws (Issue 11 — prior state unchanged).
+
+## etude-invalidation.spec.ts
+
+21 tests covering `computeDownstreamInvalidation` and `isReviewReachable` from `src/lib/etude-invalidation.ts` (Issue 11):
+
+- `computeDownstreamInvalidation` is a pure function (does not mutate its arguments).
+- Key change clears pitches and split, retains durations.
+- Octave-range change clears pitches and split, retains durations.
+- Meter change clears durations, retains pitches and split.
+- Measure-count change invalidates nothing downstream.
+- Switching to both hands with fewer than two pitches clears split and unconfirms notes (retains pitches).
+- Switching to both hands with two or more pitches clears split, keeps notes confirmed.
+- Switching to one hand clears split, keeps notes confirmed.
+- Switching to both hands with null or empty pitches unconfirms notes.
+- Key and meter both change clears the union of dependents.
+- Key and hand both change (to both, <2 pitches) clears the union of dependents.
+- No upstream field change invalidates nothing.
+- Does not throw for hostile input shapes.
+- `isReviewReachable` is true when setup and notes are confirmed for one hand.
+- `isReviewReachable` is true when setup, notes, and split are confirmed for both hands.
+- `isReviewReachable` is false when notes are not confirmed.
+- `isReviewReachable` is false when split is not confirmed for both hands.
+- `isReviewReachable` is false when setup is not confirmed.
+- `isReviewReachable` is false after an invalidation that clears `notesConfirmed` (recomputed from flags, not a stored review flag).
+- `EtudeParams` has no `reviewConfirmed` field (review completion is derived, never persisted).
 
 ## workflow-version-field.spec.ts
 

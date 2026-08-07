@@ -21,6 +21,7 @@ import { etudeParams } from '../db/schema'
 import type { EtudeParam } from '../db/schema'
 import type { DrizzleClient } from '../local-types'
 import { withRetry } from './db-access'
+import { computeDownstreamInvalidation } from './etude-invalidation'
 import type { ValidSetup } from './setup-validator'
 
 /**
@@ -43,6 +44,9 @@ export interface EtudeParams {
   setupConfirmed: boolean
   notesConfirmed: boolean
   splitConfirmed: boolean
+  selectedPitches: string | null
+  selectedDurations: string | null
+  splitBoundary: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -65,6 +69,9 @@ const mapToDomain = (row: EtudeParam): EtudeParams => ({
   setupConfirmed: row.setupConfirmed,
   notesConfirmed: row.notesConfirmed,
   splitConfirmed: row.splitConfirmed,
+  selectedPitches: row.selectedPitches,
+  selectedDurations: row.selectedDurations,
+  splitBoundary: row.splitBoundary,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 })
@@ -291,13 +298,13 @@ const updateEtudeSetupActual = async (
       return Result.ok(mapToDomain(stored))
     }
 
-    // A key or octave-range change invalidates the downstream pitch-selection
-    // and split-boundary confirmation flags (Issue 11 dependency map rows for
-    // Key and Octave Range). At this stage only the confirmation flags exist,
-    // so those are cleared. When neither key nor octaves changed but another
-    // field changed, the downstream flags are left untouched.
-    const keyChanged = stored.keySignature !== values.keySignature
-    const octavesChanged = stored.selectedOctaves !== submittedOctavesString
+    // Compute the dependent-downstream invalidation plan from the Issue 11
+    // dependency map (key, octaves, meter, measure count, hands + two-hand
+    // revalidation). The plan is applied inside the same compare-and-set write
+    // that increments the workflow version — there is no second, separate
+    // transition (cross-cutting contract section 4). Identical resubmits
+    // short-circuit above, so this only runs when at least one field changed.
+    const plan = computeDownstreamInvalidation(stored, values)
     const updated = await db
       .update(etudeParams)
       .set({
@@ -308,7 +315,11 @@ const updateEtudeSetupActual = async (
         selectedOctaves: submittedOctavesString,
         setupConfirmed: true,
         workflowVersion: sql`${etudeParams.workflowVersion} + 1`,
-        ...(keyChanged || octavesChanged ? { notesConfirmed: false, splitConfirmed: false } : {}),
+        ...(plan.clearPitches ? { selectedPitches: null } : {}),
+        ...(plan.clearDurations ? { selectedDurations: null } : {}),
+        ...(plan.clearSplit ? { splitBoundary: null } : {}),
+        ...(plan.unconfirmNotes ? { notesConfirmed: false } : {}),
+        ...(plan.unconfirmSplit ? { splitConfirmed: false } : {}),
         updatedAt: new Date(),
       })
       .where(

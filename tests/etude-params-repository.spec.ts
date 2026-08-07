@@ -215,6 +215,36 @@ const confirmNotesAndSplit = async (db: DrizzleClient, userId: string): Promise<
     .run()
 }
 
+/**
+ * Seed the downstream selection data and confirmation flags directly in the
+ * test DB so a subsequent updateEtudeSetup can be observed clearing or
+ * retaining downstream state per the Issue 11 dependency map. Mirrors what the
+ * notes and split steps (Issues 13, 14, 16) will write when they exist.
+ */
+const seedDownstreamState = async (
+  db: DrizzleClient,
+  userId: string,
+  overrides: {
+    selectedPitches?: string | null
+    selectedDurations?: string | null
+    splitBoundary?: string | null
+    notesConfirmed?: boolean
+    splitConfirmed?: boolean
+  } = {},
+): Promise<void> => {
+  await db
+    .update(etudeParams)
+    .set({
+      notesConfirmed: overrides.notesConfirmed ?? true,
+      splitConfirmed: overrides.splitConfirmed ?? true,
+      selectedPitches: overrides.selectedPitches ?? 'C4,D4',
+      selectedDurations: overrides.selectedDurations ?? 'quarter,eighth',
+      splitBoundary: overrides.splitBoundary ?? 'D4',
+    })
+    .where(eq(etudeParams.userId, userId))
+    .run()
+}
+
 describe('updateEtudeSetup', () => {
   it('persists the measure count, time signature, and hand values', async () => {
     const db = createTestDb()
@@ -353,18 +383,44 @@ describe('updateEtudeSetup key persistence and key-change invalidation', () => {
     expect(after.splitConfirmed).toBe(false)
   })
 
+  it('clears selectedPitches and splitBoundary (not selectedDurations) when the key changes', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-31b', 'thirtyone-b@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-31b'))
+    await seedDownstreamState(db, 'user-31b')
+
+    // Only the key changes — meter, hand, and octaves stay at the stored
+    // defaults so only the key row of the dependency map applies.
+    const result = await updateEtudeSetup(db, 'user-31b', before.aggregateEpoch, before.workflowVersion, {
+      measureCount: before.measureCount,
+      timeSignature: before.timeSignature,
+      hand: before.hand,
+      keySignature: 'A minor',
+      octaves: [4],
+    })
+
+    const after = unwrap(result)
+    expect(after.selectedPitches).toBeNull()
+    expect(after.splitBoundary).toBeNull()
+    expect(after.selectedDurations).toBe('quarter,eighth')
+    expect(after.notesConfirmed).toBe(false)
+    expect(after.splitConfirmed).toBe(false)
+  })
+
   it('leaves notesConfirmed and splitConfirmed unchanged when the submitted key is identical to the stored key', async () => {
     const db = createTestDb()
     await insertUser(db, 'user-32', 'thirtytwo@example.com')
     const before = unwrap(await loadOrCreateEtudeParams(db, 'user-32'))
     await confirmNotesAndSplit(db, 'user-32')
 
-    // Resubmit with the same key but a different non-key field so the
-    // version still increments; the confirmation flags must survive.
+    // Resubmit with the same key, octaves, meter, and hand — only the measure
+    // count changes (the one setup field that invalidates nothing downstream,
+    // per the Issue 11 dependency map) — so the version still increments but
+    // the confirmation flags must survive.
     const result = await updateEtudeSetup(db, 'user-32', before.aggregateEpoch, before.workflowVersion, {
       measureCount: 12,
-      timeSignature: '2/4',
-      hand: 'left',
+      timeSignature: before.timeSignature,
+      hand: before.hand,
       keySignature: before.keySignature,
       octaves: [4],
     })
@@ -481,16 +537,41 @@ describe('updateEtudeSetup octave persistence and octave-change invalidation', (
     expect(after.splitConfirmed).toBe(false)
   })
 
+  it('clears selectedPitches and splitBoundary (not selectedDurations) when only the octaves change', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-41b', 'fortyone-b@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-41b'))
+    await seedDownstreamState(db, 'user-41b')
+
+    // Only the octaves change — key, meter, and hand stay at the stored
+    // defaults so only the octave-range row of the dependency map applies.
+    const result = await updateEtudeSetup(db, 'user-41b', before.aggregateEpoch, before.workflowVersion, {
+      measureCount: before.measureCount,
+      timeSignature: before.timeSignature,
+      hand: before.hand,
+      keySignature: before.keySignature,
+      octaves: [2, 3, 4, 5, 6],
+    })
+
+    const after = unwrap(result)
+    expect(after.selectedPitches).toBeNull()
+    expect(after.splitBoundary).toBeNull()
+    expect(after.selectedDurations).toBe('quarter,eighth')
+  })
+
   it('leaves notesConfirmed and splitConfirmed unchanged when octaves are identical but another field changes', async () => {
     const db = createTestDb()
     await insertUser(db, 'user-42', 'fortytwo@example.com')
     const before = unwrap(await loadOrCreateEtudeParams(db, 'user-42'))
     await confirmNotesAndSplit(db, 'user-42')
 
+    // Only the measure count changes (the one setup field that invalidates
+    // nothing downstream, per the Issue 11 dependency map); key, octaves,
+    // meter, and hand are all identical to the stored values.
     const result = await updateEtudeSetup(db, 'user-42', before.aggregateEpoch, before.workflowVersion, {
       measureCount: 12,
-      timeSignature: '2/4',
-      hand: 'left',
+      timeSignature: before.timeSignature,
+      hand: before.hand,
       keySignature: before.keySignature,
       octaves: [4],
     })
@@ -696,5 +777,267 @@ describe('updateEtudeSetup workflowVersion compare-and-set', () => {
     }
     const reloaded = unwrap(await loadEtudeParams(db, 'user-54'))
     expect(reloaded?.workflowVersion).toBe(firstUpdate.workflowVersion)
+  })
+})
+
+describe('updateEtudeSetup full dependent-downstream invalidation (Issue 11)', () => {
+  it('clears selectedDurations (not pitches or split) when the meter changes', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-60', 'sixty@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-60'))
+    await seedDownstreamState(db, 'user-60')
+
+    // Only the meter changes — key, octaves, and hand stay at the stored
+    // defaults so only the meter row of the dependency map applies.
+    const result = await updateEtudeSetup(db, 'user-60', before.aggregateEpoch, before.workflowVersion, {
+      measureCount: before.measureCount,
+      timeSignature: '3/4',
+      hand: before.hand,
+      keySignature: before.keySignature,
+      octaves: [4],
+    })
+
+    const after = unwrap(result)
+    expect(after.selectedDurations).toBeNull()
+    expect(after.selectedPitches).toBe('C4,D4')
+    expect(after.splitBoundary).toBe('D4')
+    expect(after.notesConfirmed).toBe(false)
+    expect(after.splitConfirmed).toBe(true)
+    expect(after.workflowVersion).toBe(before.workflowVersion + 1)
+  })
+
+  it('retains all downstream state when only the measure count changes', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-61', 'sixtyone@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-61'))
+    await seedDownstreamState(db, 'user-61')
+
+    // Only measureCount changes — key, octaves, meter, and hand are identical
+    // to the stored defaults, so nothing downstream is invalidated.
+    const result = await updateEtudeSetup(db, 'user-61', before.aggregateEpoch, before.workflowVersion, {
+      measureCount: 12,
+      timeSignature: before.timeSignature,
+      hand: before.hand,
+      keySignature: before.keySignature,
+      octaves: [4],
+    })
+
+    const after = unwrap(result)
+    expect(after.selectedPitches).toBe('C4,D4')
+    expect(after.selectedDurations).toBe('quarter,eighth')
+    expect(after.splitBoundary).toBe('D4')
+    expect(after.notesConfirmed).toBe(true)
+    expect(after.splitConfirmed).toBe(true)
+    expect(after.workflowVersion).toBe(before.workflowVersion + 1)
+  })
+
+  it('clears splitBoundary and unconfirms notes when switching to both hands with fewer than two pitches', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-62', 'sixtytwo@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-62'))
+    await seedDownstreamState(db, 'user-62', {
+      selectedPitches: 'C4',
+      splitBoundary: null,
+    })
+
+    // Only the hand changes to 'both' — key, octaves, and meter stay at the
+    // stored defaults. With fewer than two stored pitches, the notes step is
+    // unconfirmed (two-hand revalidation).
+    const result = await updateEtudeSetup(db, 'user-62', before.aggregateEpoch, before.workflowVersion, {
+      measureCount: before.measureCount,
+      timeSignature: before.timeSignature,
+      hand: 'both',
+      keySignature: before.keySignature,
+      octaves: [4],
+    })
+
+    const after = unwrap(result)
+    expect(after.splitBoundary).toBeNull()
+    expect(after.selectedPitches).toBe('C4')
+    expect(after.selectedDurations).toBe('quarter,eighth')
+    expect(after.notesConfirmed).toBe(false)
+    expect(after.splitConfirmed).toBe(false)
+    expect(after.workflowVersion).toBe(before.workflowVersion + 1)
+  })
+
+  it('clears splitBoundary but keeps notes confirmed when switching to both hands with two or more pitches', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-63', 'sixtythree@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-63'))
+    await seedDownstreamState(db, 'user-63', { selectedPitches: 'C4,D4' })
+
+    // Only the hand changes to 'both' — key, octaves, and meter stay at the
+    // stored defaults. With two stored pitches, the notes step stays confirmed.
+    const result = await updateEtudeSetup(db, 'user-63', before.aggregateEpoch, before.workflowVersion, {
+      measureCount: before.measureCount,
+      timeSignature: before.timeSignature,
+      hand: 'both',
+      keySignature: before.keySignature,
+      octaves: [4],
+    })
+
+    const after = unwrap(result)
+    expect(after.splitBoundary).toBeNull()
+    expect(after.selectedPitches).toBe('C4,D4')
+    expect(after.notesConfirmed).toBe(true)
+    expect(after.splitConfirmed).toBe(false)
+  })
+
+  it('clears splitBoundary but keeps notes confirmed when switching to one hand', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-64', 'sixtyfour@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-64'))
+    await seedDownstreamState(db, 'user-64', { selectedPitches: 'C4,D4' })
+
+    // Only the hand changes to 'left' — key, octaves, and meter stay at the
+    // stored defaults. One-hand mode never requires the split step.
+    const result = await updateEtudeSetup(db, 'user-64', before.aggregateEpoch, before.workflowVersion, {
+      measureCount: before.measureCount,
+      timeSignature: before.timeSignature,
+      hand: 'left',
+      keySignature: before.keySignature,
+      octaves: [4],
+    })
+
+    const after = unwrap(result)
+    expect(after.splitBoundary).toBeNull()
+    expect(after.selectedPitches).toBe('C4,D4')
+    expect(after.notesConfirmed).toBe(true)
+    expect(after.splitConfirmed).toBe(false)
+  })
+
+  it('clears the union of dependents when key and meter both change in one submission', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-65', 'sixtyfive@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-65'))
+    await seedDownstreamState(db, 'user-65')
+
+    // Key and meter both change — hand and octaves stay at the stored defaults.
+    // The union of their dependents (pitches, durations, split) is cleared in
+    // this single committed transition, and the version increments exactly once.
+    const result = await updateEtudeSetup(db, 'user-65', before.aggregateEpoch, before.workflowVersion, {
+      measureCount: before.measureCount,
+      timeSignature: '3/4',
+      hand: before.hand,
+      keySignature: 'G major',
+      octaves: [4],
+    })
+
+    const after = unwrap(result)
+    expect(after.selectedPitches).toBeNull()
+    expect(after.selectedDurations).toBeNull()
+    expect(after.splitBoundary).toBeNull()
+    expect(after.notesConfirmed).toBe(false)
+    expect(after.splitConfirmed).toBe(false)
+    expect(after.workflowVersion).toBe(before.workflowVersion + 1)
+  })
+
+  it('retains all downstream state on an identical resubmit', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-66', 'sixtysix@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-66'))
+    // First, commit a setup so the stored values match validSetup.
+    const first = unwrap(
+      await updateEtudeSetup(db, 'user-66', before.aggregateEpoch, before.workflowVersion, validSetup),
+    )
+    await seedDownstreamState(db, 'user-66')
+
+    // Resubmit the exact stored values.
+    const result = await updateEtudeSetup(db, 'user-66', first.aggregateEpoch, first.workflowVersion, {
+      measureCount: validSetup.measureCount,
+      timeSignature: validSetup.timeSignature,
+      hand: validSetup.hand,
+      keySignature: validSetup.keySignature,
+      octaves: validSetup.octaves,
+    })
+
+    const after = unwrap(result)
+    expect(after.selectedPitches).toBe('C4,D4')
+    expect(after.selectedDurations).toBe('quarter,eighth')
+    expect(after.splitBoundary).toBe('D4')
+    expect(after.notesConfirmed).toBe(true)
+    expect(after.splitConfirmed).toBe(true)
+    expect(after.workflowVersion).toBe(first.workflowVersion)
+  })
+
+  it('rejects a stale version alongside upstream changes before any invalidation takes place', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-67', 'sixtyseven@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-67'))
+    await seedDownstreamState(db, 'user-67')
+    // Bump the stored version with a first successful update.
+    const first = unwrap(
+      await updateEtudeSetup(db, 'user-67', before.aggregateEpoch, before.workflowVersion, {
+        ...validSetup,
+        measureCount: 12,
+      }),
+    )
+    // Re-seed downstream state because the first update changed only measureCount
+    // (no invalidation), but seedDownstreamState was called before the update.
+    await seedDownstreamState(db, 'user-67')
+
+    // Submit a key change carrying the stale version.
+    const staleVersion = before.workflowVersion
+    const result = await updateEtudeSetup(db, 'user-67', first.aggregateEpoch, staleVersion, {
+      ...validSetup,
+      keySignature: 'G major',
+    })
+
+    expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('version-mismatch')
+    }
+    // Reload and confirm the prior upstream values, downstream selections, and
+    // version are all still in place — the CAS rejected first, nothing cleared.
+    const reloaded = unwrap(await loadEtudeParams(db, 'user-67'))
+    expect(reloaded?.keySignature).toBe(first.keySignature)
+    expect(reloaded?.selectedPitches).toBe('C4,D4')
+    expect(reloaded?.selectedDurations).toBe('quarter,eighth')
+    expect(reloaded?.splitBoundary).toBe('D4')
+    expect(reloaded?.notesConfirmed).toBe(true)
+    expect(reloaded?.splitConfirmed).toBe(true)
+    expect(reloaded?.workflowVersion).toBe(first.workflowVersion)
+  })
+
+  it('returns a db-error and persists nothing when the invalidating write throws', async () => {
+    const realDb = createTestDb()
+    await insertUser(realDb, 'user-68', 'sixtyeight@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(realDb, 'user-68'))
+    await seedDownstreamState(realDb, 'user-68')
+
+    // Wrap the realDb so the update() call throws, but select() still works.
+    const throwingDb = new Proxy(realDb, {
+      get(target, prop, receiver) {
+        if (prop === 'update') {
+          return () => {
+            throw new Error('injected failure')
+          }
+        }
+        return Reflect.get(target, prop, receiver)
+      },
+    }) as unknown as DrizzleClient
+
+    const result = await updateEtudeSetup(
+      throwingDb,
+      'user-68',
+      before.aggregateEpoch,
+      before.workflowVersion,
+      { ...validSetup, keySignature: 'G major' },
+    )
+
+    expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('db-error')
+    }
+    // Confirm via the real client that nothing was persisted — prior upstream
+    // values, downstream selections, and version are all unchanged.
+    const reloaded = unwrap(await loadEtudeParams(realDb, 'user-68'))
+    expect(reloaded?.keySignature).toBe(before.keySignature)
+    expect(reloaded?.selectedPitches).toBe('C4,D4')
+    expect(reloaded?.selectedDurations).toBe('quarter,eighth')
+    expect(reloaded?.splitBoundary).toBe('D4')
+    expect(reloaded?.notesConfirmed).toBe(true)
+    expect(reloaded?.splitConfirmed).toBe(true)
+    expect(reloaded?.workflowVersion).toBe(before.workflowVersion)
   })
 })

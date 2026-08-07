@@ -158,3 +158,10 @@ A catalog and summaries of all end-to-end tests under `e2e-tests/`.
 1 Playwright test covering the operation-POST precondition refusal from Issue 10 (two-tab scenario):
 
 - Two browser tabs load `/etude/setup` (both see version 1); tab A submits a setup change (version becomes 2); tab B POSTs to the test-only operation route (`POST /test/etude/operation-precondition`) carrying the stale version 1 and the captured epoch 1; the route refuses with a 303 to the canonical route (`/etude/setup`) with an explanatory error, having acquired no lock, made no external call, and changed no state. The aggregate is unchanged (still tab A's values, version still 2).
+
+## etude/14-etude-downstream-invalidation.spec.ts
+
+2 Playwright tests covering the Issue 11 dependent-downstream invalidation end-to-end:
+
+- Changing the key clears pitches and split, retains durations, and makes review unreachable: signs in, submits a valid setup (measures 16 to force a write), seeds downstream state via the test-only `POST /test/etude/seed-downstream-state` route (notesConfirmed, splitConfirmed, selectedPitches, selectedDurations, splitBoundary), inspects via `GET /test/etude/aggregate-state` to confirm review is reachable, then changes the key to G major via the real setup form and inspects again — selectedPitches and splitBoundary are null, selectedDurations is retained, notesConfirmed and splitConfirmed are false, isReviewReachable is false, and the workflow version incremented by 1.
+- An identical setup resubmit retains all downstream state: after seeding downstream state, resubmits the exact stored setup values via the real form and inspects — all downstream data and confirmation flags are retained, isReviewReachable is true, and the workflow version is unchanged.

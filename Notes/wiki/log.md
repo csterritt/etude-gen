@@ -231,3 +231,28 @@ Modified test files:
 - `tests/etude-params-repository.spec.ts` — 5 new tests for the workflowVersion CAS (matching version succeeds, older version rejected, newer version rejected, concurrent updates, identical resubmit with stale version); existing tests updated to the new `expectedWorkflowVersion` parameter and typed `EtudeUpdateError` assertions.
 
 Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`, `project-overview.md`.
+
+## [2026-08-07] ingest | issue-011 dependent downstream invalidation
+
+Ingested the Issue 11 dependent-downstream invalidation implementation.
+
+New source files:
+- `src/lib/etude-invalidation.ts` — pure `computeDownstreamInvalidation` function encoding the Issue 11 dependency map (key, octaves, meter, measure count, hands + two-hand revalidation, unions) and the derived `isReviewReachable` predicate (no stored review flag).
+- `src/routes/test/etude-downstream-state.ts` — test-only `POST /test/etude/seed-downstream-state` and `GET /test/etude/aggregate-state` routes for e2e testing (gated by `isTestRouteEnabled`).
+
+Modified source files:
+- `src/db/schema.ts` — added nullable text columns `selectedPitches`, `selectedDurations`, `splitBoundary` to the `etudeParams` table.
+- `src/lib/etude-params-repository.ts` — `EtudeParams` interface and `mapToDomain` include the new fields; `updateEtudeSetupActual` now calls `computeDownstreamInvalidation` and applies the plan inside the single CAS write (replacing the inline key/octaves-only logic).
+- `src/index.ts` — mounted `handleEtudeDownstreamState` inside the `isTestRouteEnabledFlag` block.
+- `drizzle/0003_worthless_hedge_knight.sql` — new migration adding the three columns.
+- `schema.sql` — regenerated to include the new columns.
+
+New test files:
+- `tests/etude-invalidation.spec.ts` — 21 tests covering `computeDownstreamInvalidation` (every dependency-map row, two-hand revalidation, unions, no-ops, purity) and `isReviewReachable` (derived from flags, no stored review flag).
+- `e2e-tests/etude/14-etude-downstream-invalidation.spec.ts` — 2 Playwright tests covering the end-to-end invalidation (key change clears pitches + split, retains durations, review unreachable; identical resubmit retains all downstream state).
+
+Modified test files:
+- `tests/etude-params-repository.spec.ts` — 11 new tests for the full dependency map (meter, measure-count, hands, unions, identical-resubmit-retain, stale-version-first, injected-failure); existing key/octave invalidation tests updated to assert the new data fields; `seedDownstreamState` helper added.
+- `tests/canonical-route.spec.ts` and `tests/operation-precondition.spec.ts` — `baseParams`/`makeParams` helpers updated with the new nullable fields.
+
+Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`, `project-overview.md`.

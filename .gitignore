@@ -36,3 +36,5 @@ schema.sql
 .dev.vars.all
 .obsidian/
 .sem
+# Generated build artifact from scripts/package-rhythm-catalog.ts
+src/lib/rhythm-catalog-data.ts

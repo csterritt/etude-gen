@@ -11,7 +11,9 @@
  *   still containing no secret values.
  *
  * The rhythm-catalog health surface is a pluggable contribution point; the
- * catalog parsing and validation rules are owned by Issue 12.
+ * catalog parsing and validation rules are owned by Issue 12. This module
+ * builds the catalog contribution from the packaged catalog text via the
+ * parser in `src/lib/rhythm-catalog.ts` and passes it to `runHealthCheck`.
  *
  * @module routes/build-health
  */
@@ -25,6 +27,8 @@ import {
   type EtudeConfigInput,
   type ConfigDefect,
 } from '../lib/config-validator'
+import { parseRhythmCatalog, type CatalogDefect } from '../lib/rhythm-catalog'
+import { RHYTHM_CATALOG_TEXT } from '../lib/rhythm-catalog-data'
 import { logInfo, logError } from '../lib/logger'
 
 /**
@@ -37,6 +41,33 @@ export interface CatalogHealthContribution {
   readonly healthy: boolean
   /** Defects found by the catalog validator, if any. */
   readonly defects: readonly ConfigDefect[]
+}
+
+/**
+ * Build a `CatalogHealthContribution` from packaged rhythm-catalog text by
+ * running it through the catalog parser. A healthy catalog yields a healthy
+ * contribution with no defects. A malformed catalog yields an unhealthy
+ * contribution whose defects are mapped to `ConfigDefect` entries with
+ * `valueName: 'rhythm-catalog'` and a `message` naming the offending meter
+ * and line from the parser defect. The catalog text is the build-time
+ * packaged string from `src/lib/rhythm-catalog-data.ts`; no runtime
+ * file-system read occurs.
+ *
+ * @param catalogText - The packaged rhythm-catalog text.
+ * @returns The catalog health contribution.
+ */
+export const buildCatalogHealthContribution = (
+  catalogText: string,
+): CatalogHealthContribution => {
+  const result = parseRhythmCatalog(catalogText)
+  if (result.isOk) {
+    return { healthy: true, defects: [] }
+  }
+  const defects: ConfigDefect[] = result.error.map((d: CatalogDefect) => ({
+    valueName: 'rhythm-catalog',
+    message: `rhythm catalog defect at meter ${d.meter}, line ${d.line}: ${d.message}`,
+  }))
+  return { healthy: false, defects }
 }
 
 /**
@@ -152,7 +183,7 @@ export const buildHealth = (app: Hono<{ Bindings: Bindings }>): void => {
       LILYPOND_API_KEY: c.env.LILYPOND_API_KEY,
       LILYPOND_TIMEOUT_MS: c.env.LILYPOND_TIMEOUT_MS,
     }
-    const result = runHealthCheck(input)
+    const result = runHealthCheck(input, buildCatalogHealthContribution(RHYTHM_CATALOG_TEXT))
 
     // Always write the detailed report to the startup/deployment log.
     if (result.healthy) {

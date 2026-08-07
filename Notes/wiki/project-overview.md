@@ -22,6 +22,28 @@ The etude feature requires additional configuration beyond the existing auth and
 - `LILYPOND_TIMEOUT_MS` variable (defaults to 30,000 ms).
 - A health route (`/health`) that validates all required configuration before the application is considered healthy, split into an anonymous liveness surface and a privileged detailed operator report.
 
+## Rhythm catalog (Issue 12)
+
+The curated rhythm catalog at `Notes/all-rhythms.txt` is the authoritative, hand-maintained source of complete-measure rhythm patterns. Each supported time-signature heading (`2/4`, `3/4`, `4/4`) is followed by one token sequence per line over the six supported tokens:
+
+| Token | Duration (quarter-note beats) | Meaning |
+| --- | --- | --- |
+| `W` | 4 | whole |
+| `H` | 2 | half |
+| `D` | 3 | dotted-half |
+| `Q` | 1 | quarter |
+| `R` | 1.5 | dotted-quarter |
+| `E` | 0.5 | eighth |
+
+Measure lengths are fixed per supported meter: 2/4 = 2, 3/4 = 3, 4/4 = 4 quarter-note beats. The parser and eligible-rhythm calculation live in `src/lib/rhythm-catalog.ts`:
+
+- `parseRhythmCatalog(text)` validates syntax (supported tokens and headings only), exact measure length for every pattern under its heading, and at least one pattern per supported meter, collecting every defect in one pass. Each defect names the offending meter and the 1-based line number. Length validation uses exact arithmetic — durations and measure lengths are counted in eighth-note units (quarter beats × 2) and compared as integers, never accumulated floating-point sums with a tolerance, so a pattern of eighths and dotted quarters is judged exactly. Duplicate identical patterns under the same heading are deliberately allowed in the curated file (it is maintained by hand and an accidental repeat must not break the build); the parsed catalog de-duplicates them, preserving first-appearance order, so each distinct pattern appears exactly once and the recency-weighted repeat selection in Issue 24 is not skewed by a curation accident.
+- `computeEligibleRhythms(catalog, meter, selectedTokens)` returns the patterns for the given meter whose every token is in the selected set; a selection with no qualifying pattern returns an empty array (never an error), and an unsupported meter returns an empty array.
+
+The catalog is packaged into the worker at build time: `scripts/package-rhythm-catalog.ts` reads `Notes/all-rhythms.txt` and emits a generated, gitignored `src/lib/rhythm-catalog-data.ts` exporting the text as `RHYTHM_CATALOG_TEXT`. The `prebuild` npm hook regenerates it before every `wrangler build`, so the runtime parser imports the string with no runtime file-system read.
+
+Catalog validation contributes to the health check from Issue 1: `buildCatalogHealthContribution` in `src/routes/build-health.tsx` runs the packaged catalog through the parser and maps any defects to `ConfigDefect` entries with `valueName: 'rhythm-catalog'` and a message naming the meter and line. A malformed catalog makes the aggregate health result unhealthy rather than failing at generation time, while the anonymous liveness payload still carries only the healthy flag and leaks no defect detail.
+
 ## Correlation, logging, and safe errors
 
 Every request carries an application-generated UUID v4 correlation identifier:

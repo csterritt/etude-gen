@@ -8,6 +8,8 @@
     "dev-interest-sign-up": "./run-dev.sh interest-sign-up",
     "dev-both-sign-up": "./run-dev.sh both-sign-up",
     "build": "wrangler build",
+    "prebuild": "bun scripts/package-rhythm-catalog.ts",
+    "package-rhythm-catalog": "bun scripts/package-rhythm-catalog.ts",
     "deploy": "wrangler deploy --minify",
     "cf-typegen": "wrangler types --env-interface Bindings",
     "fmt": "oxfmt",

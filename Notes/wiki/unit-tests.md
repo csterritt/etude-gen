@@ -21,6 +21,8 @@ A catalog and summaries of all unit tests under `tests/`.
 - Anonymous liveness: only a healthy flag; no binding names, value names, defect detail, resolved values, or secrets.
 - Privileged detailed report: names every missing value, includes resolved timeout, never contains secret values.
 
+The catalog contribution built from the real packaged catalog by `buildCatalogHealthContribution` (added in Issue 12) is covered by `health-route-catalog.spec.ts`.
+
 ## no-hardcoded-lilypond-version.spec.ts
 
 1 guardrail test scanning `src/` for any hard-coded LilyPond version string (e.g. `2.x.y` near "lilypond" context). Ensures no permanent version is embedded in application source; the reported version is retained only with SVG render metadata for diagnosis.
@@ -217,6 +219,41 @@ A catalog and summaries of all unit tests under `tests/`.
 - `expandOctaveRange`: returns the contiguous min/max regardless of input order; returns the same range for a single-element selection.
 - `deriveScaleRangePitches`: produces the tonic-to-tonic pitch set for D major octave 4 using key spelling (D E F-sharp G A B C-sharp D5); produces the tonic-to-tonic pitch set for E-flat major octave 4 using flat spelling (E-flat F G A-flat B-flat C D-flat E-flat5); produces the correct set for C major octave 4 (C D E F G A B C5).
 - `deriveAvailablePitches`: includes C7 for G major octaves 2 through 6 (C in key, C7 inside range); includes C7 for C major octaves 2 through 6; excludes every octave-7 pitch other than C7 for A minor octaves 2 through 6; leaves C7 absent for D major octaves 2-6 (C not in key, range reaches octave 7); leaves C7 absent for F-sharp minor octaves 2-6 (C not in key); produces identical pitches for canonical and arbitrary-order submissions.
+
+## rhythm-catalog.spec.ts
+
+21 tests covering `TOKEN_DURATIONS`, `MEASURE_LENGTHS`, `SUPPORTED_TOKENS`, `SUPPORTED_METERS`, and `parseRhythmCatalog` from `src/lib/rhythm-catalog.ts`:
+
+- `TOKEN_DURATIONS`: maps each supported token to its exact quarter-note-beat value (`W`=4, `H`=2, `D`=3, `Q`=1, `R`=1.5, `E`=0.5) and contains exactly the six supported tokens.
+- `MEASURE_LENGTHS`: maps each supported meter to its exact measure length in quarter-note beats (2/4=2, 3/4=3, 4/4=4) and contains exactly the three supported meters.
+- `SUPPORTED_TOKENS` / `SUPPORTED_METERS`: the sets match the table keys.
+- `parseRhythmCatalog` valid catalogs: parses a catalog with one pattern per supported meter into an Ok catalog; every parsed pattern sums exactly to its heading measure length in eighth-note units.
+- Exact arithmetic, no floating-point tolerance: accepts a pattern of eighths and dotted quarters exactly at the measure length (`ER` under 2/4); rejects the same fractional pattern one eighth-note short (`R` under 2/4) and one eighth-note long (`EER` under 2/4), each naming the meter and line.
+- Syntax and heading defects: rejects an unknown token, a missing heading (a supported meter with no patterns), an unsupported heading (e.g. `5/4`), and a malformed heading line, each naming the offending meter and/or line; reports every defect together rather than failing on the first one.
+- De-duplication on packaging: passes validation with two identical patterns under the same heading; the parsed catalog contains a duplicated pattern exactly once.
+- Real curated catalog: the real `Notes/all-rhythms.txt` (read from disk in the test) validates with all three supported meters present, every pattern sums exactly to its heading measure length, and the packaged catalog contains no duplicate patterns.
+
+## rhythm-catalog-eligible.spec.ts
+
+8 tests covering `computeEligibleRhythms` from `src/lib/rhythm-catalog.ts`:
+
+- Returns only patterns whose every token is in the selected set (e.g. `{Q}` for 2/4 → `QQ`).
+- Returns multiple patterns when all their tokens are selected (e.g. `{E,R}` for 2/4 → `EEEE`, `ER`).
+- Returns a single-token pattern when only that token is selected (e.g. `{H}` for 2/4 → `H`).
+- Returns an empty array when no pattern qualifies (e.g. `{D}` for 2/4) rather than throwing.
+- Returns an empty array for a disjoint selection (e.g. `{W}` for 2/4).
+- Returns an empty array for an unsupported meter (e.g. `5/4`) rather than throwing.
+- The eligible set contains no duplicate patterns.
+- Does not mutate its arguments.
+
+## health-route-catalog.spec.ts
+
+10 tests covering `buildCatalogHealthContribution` and its integration with `runHealthCheck`, `buildAnonymousLiveness`, and `buildDetailedReport` from `src/routes/build-health.tsx`:
+
+- `buildCatalogHealthContribution`: builds a healthy contribution from a valid packaged catalog; builds an unhealthy contribution from a corrupted catalog; names the offending meter and line in the catalog defect message.
+- `runHealthCheck` integration: healthy when config and the packaged catalog are both healthy; unhealthy when the packaged catalog is corrupted; aggregates catalog defects and configuration defects together.
+- Anonymous liveness: carries only the healthy flag when the catalog is corrupted and leaks no `rhythm-catalog` value name, meter, line, or defect detail.
+- Detailed report: names the catalog defect and the offending meter and line; never contains secret values alongside catalog defects.
 
 ## etude-form-parser.spec.ts
 

@@ -256,3 +256,24 @@ Modified test files:
 - `tests/canonical-route.spec.ts` and `tests/operation-precondition.spec.ts` — `baseParams`/`makeParams` helpers updated with the new nullable fields.
 
 Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`, `project-overview.md`.
+
+## [2026-08-07] ingest | issue-012 rhythm catalog packaging validation eligible rhythms
+
+Ingested the rhythm catalog parser, validator, eligible-rhythm calculation, build-time packaging, and health-route catalog wiring (issue #12).
+
+New source files:
+- `src/lib/rhythm-catalog.ts` — parser/validator (`parseRhythmCatalog`) and eligible-rhythm calculation (`computeEligibleRhythms`); exact eighth-note-unit arithmetic; de-duplicates duplicate patterns under the same heading; token-duration and measure-length tables; supported token/meter sets.
+- `src/lib/rhythm-catalog-data.ts` — generated, gitignored build artifact exporting `RHYTHM_CATALOG_TEXT` (the packaged catalog text); produced by `scripts/package-rhythm-catalog.ts` via the `prebuild` npm hook.
+- `scripts/package-rhythm-catalog.ts` — build-time packaging script reading `Notes/all-rhythms.txt` and emitting `src/lib/rhythm-catalog-data.ts`.
+
+Modified source files:
+- `src/routes/build-health.tsx` — added `buildCatalogHealthContribution(catalogText)` which runs the packaged catalog through `parseRhythmCatalog` and maps defects to `ConfigDefect` entries naming the meter and line; the health route handler now passes the contribution to `runHealthCheck`.
+- `package.json` — added `prebuild` and `package-rhythm-catalog` scripts.
+- `.gitignore` — added `src/lib/rhythm-catalog-data.ts` (generated build artifact).
+
+New test files:
+- `tests/rhythm-catalog.spec.ts` — 21 tests covering token durations, measure lengths, exact-arithmetic length validation, syntax/heading defects naming meter and line, de-duplication, and the real curated catalog validating with all three meters present.
+- `tests/rhythm-catalog-eligible.spec.ts` — 8 tests covering `computeEligibleRhythms` (all-tokens-selected filter, empty-not-error, unsupported meter, no mutation, no duplicates).
+- `tests/health-route-catalog.spec.ts` — 10 tests covering `buildCatalogHealthContribution` and its integration with `runHealthCheck`, `buildAnonymousLiveness`, and `buildDetailedReport` (healthy/corrupted catalog, aggregate defects, anonymous payload leaks nothing, detailed report names meter and line without secrets).
+
+Wiki pages updated: `source-code.md`, `unit-tests.md`, `project-overview.md`.

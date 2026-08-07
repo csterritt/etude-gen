@@ -221,7 +221,7 @@ describe('updateEtudeSetup', () => {
     await insertUser(db, 'user-20', 'twenty@example.com')
     const before = unwrap(await loadOrCreateEtudeParams(db, 'user-20'))
 
-    const result = await updateEtudeSetup(db, 'user-20', before.aggregateEpoch, validSetup)
+    const result = await updateEtudeSetup(db, 'user-20', before.aggregateEpoch, before.workflowVersion, validSetup)
 
     const after = unwrap(result)
     expect(after.measureCount).toBe(16)
@@ -234,7 +234,7 @@ describe('updateEtudeSetup', () => {
     await insertUser(db, 'user-21', 'twentyone@example.com')
     const before = unwrap(await loadOrCreateEtudeParams(db, 'user-21'))
 
-    const result = await updateEtudeSetup(db, 'user-21', before.aggregateEpoch, validSetup)
+    const result = await updateEtudeSetup(db, 'user-21', before.aggregateEpoch, before.workflowVersion, validSetup)
 
     const after = unwrap(result)
     expect(after.workflowVersion).toBe(before.workflowVersion + 1)
@@ -245,7 +245,7 @@ describe('updateEtudeSetup', () => {
     await insertUser(db, 'user-22', 'twentytwo@example.com')
     const before = unwrap(await loadOrCreateEtudeParams(db, 'user-22'))
 
-    const result = await updateEtudeSetup(db, 'user-22', before.aggregateEpoch, validSetup)
+    const result = await updateEtudeSetup(db, 'user-22', before.aggregateEpoch, before.workflowVersion, validSetup)
 
     const after = unwrap(result)
     expect(after.setupConfirmed).toBe(true)
@@ -256,7 +256,7 @@ describe('updateEtudeSetup', () => {
     await insertUser(db, 'user-23', 'twentythree@example.com')
     const before = unwrap(await loadOrCreateEtudeParams(db, 'user-23'))
 
-    const result = await updateEtudeSetup(db, 'user-23', before.aggregateEpoch, validSetup)
+    const result = await updateEtudeSetup(db, 'user-23', before.aggregateEpoch, before.workflowVersion, validSetup)
 
     const after = unwrap(result)
     expect(after.notesConfirmed).toBe(false)
@@ -269,9 +269,12 @@ describe('updateEtudeSetup', () => {
     const before = unwrap(await loadOrCreateEtudeParams(db, 'user-24'))
 
     const staleEpoch = before.aggregateEpoch - 1
-    const result = await updateEtudeSetup(db, 'user-24', staleEpoch, validSetup)
+    const result = await updateEtudeSetup(db, 'user-24', staleEpoch, before.workflowVersion, validSetup)
 
     expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('epoch-mismatch')
+    }
     // Reload and confirm the stored aggregate is unchanged.
     const reloaded = unwrap(await loadEtudeParams(db, 'user-24'))
     expect(reloaded?.measureCount).toBe(before.measureCount)
@@ -285,7 +288,7 @@ describe('updateEtudeSetup', () => {
     const db = createTestDb()
     await insertUser(db, 'user-25', 'twentyfive@example.com')
 
-    const result = await updateEtudeSetup(db, 'user-25', 1, validSetup)
+    const result = await updateEtudeSetup(db, 'user-25', 1, 1, validSetup)
 
     expect(result.isErr).toBe(true)
     expect(await countEtudeParamsForUser(db, 'user-25')).toBe(0)
@@ -298,7 +301,7 @@ describe('updateEtudeSetup', () => {
     const ownerBefore = unwrap(await loadOrCreateEtudeParams(db, 'user-26'))
     const other = unwrap(await loadOrCreateEtudeParams(db, 'user-27'))
 
-    const result = await updateEtudeSetup(db, 'user-26', ownerBefore.aggregateEpoch, validSetup)
+    const result = await updateEtudeSetup(db, 'user-26', ownerBefore.aggregateEpoch, ownerBefore.workflowVersion, validSetup)
 
     const ownerAfter = unwrap(result)
     expect(ownerAfter.userId).toBe('user-26')
@@ -317,7 +320,7 @@ describe('updateEtudeSetup key persistence and key-change invalidation', () => {
     await insertUser(db, 'user-30', 'thirty@example.com')
     const before = unwrap(await loadOrCreateEtudeParams(db, 'user-30'))
 
-    const result = await updateEtudeSetup(db, 'user-30', before.aggregateEpoch, {
+    const result = await updateEtudeSetup(db, 'user-30', before.aggregateEpoch, before.workflowVersion, {
       ...validSetup,
       keySignature: 'E-flat major',
     })
@@ -339,7 +342,7 @@ describe('updateEtudeSetup key persistence and key-change invalidation', () => {
     expect(confirmed?.notesConfirmed).toBe(true)
     expect(confirmed?.splitConfirmed).toBe(true)
 
-    const result = await updateEtudeSetup(db, 'user-31', before.aggregateEpoch, {
+    const result = await updateEtudeSetup(db, 'user-31', before.aggregateEpoch, before.workflowVersion, {
       ...validSetup,
       keySignature: 'A minor',
     })
@@ -358,7 +361,7 @@ describe('updateEtudeSetup key persistence and key-change invalidation', () => {
 
     // Resubmit with the same key but a different non-key field so the
     // version still increments; the confirmation flags must survive.
-    const result = await updateEtudeSetup(db, 'user-32', before.aggregateEpoch, {
+    const result = await updateEtudeSetup(db, 'user-32', before.aggregateEpoch, before.workflowVersion, {
       measureCount: 12,
       timeSignature: '2/4',
       hand: 'left',
@@ -380,7 +383,7 @@ describe('updateEtudeSetup key persistence and key-change invalidation', () => {
     await confirmNotesAndSplit(db, 'user-33')
 
     // Resubmit the exact stored values.
-    const result = await updateEtudeSetup(db, 'user-33', before.aggregateEpoch, {
+    const result = await updateEtudeSetup(db, 'user-33', before.aggregateEpoch, before.workflowVersion, {
       measureCount: before.measureCount,
       timeSignature: before.timeSignature,
       hand: before.hand,
@@ -401,7 +404,7 @@ describe('updateEtudeSetup key persistence and key-change invalidation', () => {
     const before = unwrap(await loadOrCreateEtudeParams(db, 'user-34'))
     await confirmNotesAndSplit(db, 'user-34')
 
-    const result = await updateEtudeSetup(db, 'user-34', before.aggregateEpoch, {
+    const result = await updateEtudeSetup(db, 'user-34', before.aggregateEpoch, before.workflowVersion, {
       measureCount: 20,
       timeSignature: before.timeSignature,
       hand: before.hand,
@@ -423,12 +426,15 @@ describe('updateEtudeSetup key persistence and key-change invalidation', () => {
     await confirmNotesAndSplit(db, 'user-35')
 
     const staleEpoch = before.aggregateEpoch - 1
-    const result = await updateEtudeSetup(db, 'user-35', staleEpoch, {
+    const result = await updateEtudeSetup(db, 'user-35', staleEpoch, before.workflowVersion, {
       ...validSetup,
       keySignature: 'E minor',
     })
 
     expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('epoch-mismatch')
+    }
     // Reload and confirm nothing changed — no invalidation took place.
     const reloaded = unwrap(await loadEtudeParams(db, 'user-35'))
     expect(reloaded?.keySignature).toBe(before.keySignature)
@@ -444,7 +450,7 @@ describe('updateEtudeSetup octave persistence and octave-change invalidation', (
     await insertUser(db, 'user-40', 'forty@example.com')
     const before = unwrap(await loadOrCreateEtudeParams(db, 'user-40'))
 
-    const result = await updateEtudeSetup(db, 'user-40', before.aggregateEpoch, {
+    const result = await updateEtudeSetup(db, 'user-40', before.aggregateEpoch, before.workflowVersion, {
       ...validSetup,
       octaves: [2, 4, 6],
     })
@@ -464,7 +470,7 @@ describe('updateEtudeSetup octave persistence and octave-change invalidation', (
     expect(confirmed?.notesConfirmed).toBe(true)
     expect(confirmed?.splitConfirmed).toBe(true)
 
-    const result = await updateEtudeSetup(db, 'user-41', before.aggregateEpoch, {
+    const result = await updateEtudeSetup(db, 'user-41', before.aggregateEpoch, before.workflowVersion, {
       ...validSetup,
       octaves: [2, 3, 4, 5, 6],
     })
@@ -481,7 +487,7 @@ describe('updateEtudeSetup octave persistence and octave-change invalidation', (
     const before = unwrap(await loadOrCreateEtudeParams(db, 'user-42'))
     await confirmNotesAndSplit(db, 'user-42')
 
-    const result = await updateEtudeSetup(db, 'user-42', before.aggregateEpoch, {
+    const result = await updateEtudeSetup(db, 'user-42', before.aggregateEpoch, before.workflowVersion, {
       measureCount: 12,
       timeSignature: '2/4',
       hand: 'left',
@@ -501,7 +507,7 @@ describe('updateEtudeSetup octave persistence and octave-change invalidation', (
     const before = unwrap(await loadOrCreateEtudeParams(db, 'user-43'))
     await confirmNotesAndSplit(db, 'user-43')
 
-    const result = await updateEtudeSetup(db, 'user-43', before.aggregateEpoch, {
+    const result = await updateEtudeSetup(db, 'user-43', before.aggregateEpoch, before.workflowVersion, {
       measureCount: before.measureCount,
       timeSignature: before.timeSignature,
       hand: before.hand,
@@ -521,7 +527,7 @@ describe('updateEtudeSetup octave persistence and octave-change invalidation', (
     const before = unwrap(await loadOrCreateEtudeParams(db, 'user-44'))
     await confirmNotesAndSplit(db, 'user-44')
 
-    const result = await updateEtudeSetup(db, 'user-44', before.aggregateEpoch, {
+    const result = await updateEtudeSetup(db, 'user-44', before.aggregateEpoch, before.workflowVersion, {
       ...validSetup,
       keySignature: 'A minor',
       octaves: [2, 3, 4, 5, 6],
@@ -541,16 +547,154 @@ describe('updateEtudeSetup octave persistence and octave-change invalidation', (
     await confirmNotesAndSplit(db, 'user-45')
 
     const staleEpoch = before.aggregateEpoch - 1
-    const result = await updateEtudeSetup(db, 'user-45', staleEpoch, {
+    const result = await updateEtudeSetup(db, 'user-45', staleEpoch, before.workflowVersion, {
       ...validSetup,
       octaves: [2, 3, 4, 5, 6],
     })
 
     expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('epoch-mismatch')
+    }
     const reloaded = unwrap(await loadEtudeParams(db, 'user-45'))
     expect(reloaded?.selectedOctaves).toBe(before.selectedOctaves)
     expect(reloaded?.workflowVersion).toBe(before.workflowVersion)
     expect(reloaded?.notesConfirmed).toBe(true)
     expect(reloaded?.splitConfirmed).toBe(true)
+  })
+})
+
+describe('updateEtudeSetup workflowVersion compare-and-set', () => {
+  it('succeeds and increments the version when the expected version matches the stored version', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-50', 'fifty@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-50'))
+
+    const result = await updateEtudeSetup(
+      db,
+      'user-50',
+      before.aggregateEpoch,
+      before.workflowVersion,
+      validSetup,
+    )
+
+    const after = unwrap(result)
+    expect(after.workflowVersion).toBe(before.workflowVersion + 1)
+    expect(after.measureCount).toBe(16)
+  })
+
+  it('rejects with a typed version-mismatch when the expected version is older than the stored version and persists nothing', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-51', 'fiftyone@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-51'))
+    // Bump the stored version by doing a first successful update.
+    const firstUpdate = unwrap(
+      await updateEtudeSetup(db, 'user-51', before.aggregateEpoch, before.workflowVersion, validSetup),
+    )
+    expect(firstUpdate.workflowVersion).toBe(before.workflowVersion + 1)
+
+    // Now submit with the old (stale) version.
+    const staleVersion = before.workflowVersion
+    const result = await updateEtudeSetup(
+      db,
+      'user-51',
+      firstUpdate.aggregateEpoch,
+      staleVersion,
+      { ...validSetup, measureCount: 20 },
+    )
+
+    expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('version-mismatch')
+    }
+    // Reload and confirm nothing changed — the stale submission persisted nothing.
+    const reloaded = unwrap(await loadEtudeParams(db, 'user-51'))
+    expect(reloaded?.workflowVersion).toBe(firstUpdate.workflowVersion)
+    expect(reloaded?.measureCount).toBe(16)
+  })
+
+  it('rejects with a typed version-mismatch when the expected version is newer than the stored version and persists nothing', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-52', 'fiftytwo@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-52'))
+
+    // Submit a version that is ahead of the current stored version.
+    const newerVersion = before.workflowVersion + 5
+    const result = await updateEtudeSetup(
+      db,
+      'user-52',
+      before.aggregateEpoch,
+      newerVersion,
+      validSetup,
+    )
+
+    expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('version-mismatch')
+    }
+    // Reload and confirm nothing changed.
+    const reloaded = unwrap(await loadEtudeParams(db, 'user-52'))
+    expect(reloaded?.workflowVersion).toBe(before.workflowVersion)
+    expect(reloaded?.measureCount).toBe(before.measureCount)
+    expect(reloaded?.setupConfirmed).toBe(false)
+  })
+
+  it('rejects at most one of two concurrent updates with the same expected version', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-53', 'fiftythree@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-53'))
+
+    const [a, b] = await Promise.all([
+      updateEtudeSetup(db, 'user-53', before.aggregateEpoch, before.workflowVersion, {
+        ...validSetup,
+        measureCount: 12,
+      }),
+      updateEtudeSetup(db, 'user-53', before.aggregateEpoch, before.workflowVersion, {
+        ...validSetup,
+        measureCount: 20,
+      }),
+    ])
+
+    const okCount = [a, b].filter((r) => r.isOk).length
+    const errCount = [a, b].filter((r) => r.isErr).length
+    expect(okCount).toBe(1)
+    expect(errCount).toBe(1)
+    // The error is a typed version-mismatch (the row that lost the CAS).
+    const errResult = [a, b].find((r) => r.isErr)!
+    if (!errResult.isOk) {
+      expect(errResult.error.kind).toBe('version-mismatch')
+    }
+
+    // Reload and confirm the version incremented exactly once.
+    const reloaded = unwrap(await loadEtudeParams(db, 'user-53'))
+    expect(reloaded?.workflowVersion).toBe(before.workflowVersion + 1)
+    // The winner's measureCount is persisted — either 12 or 20.
+    expect([12, 20]).toContain(reloaded!.measureCount)
+  })
+
+  it('rejects an identical resubmit with a stale version as a version-mismatch', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-54', 'fiftyfour@example.com')
+    const before = unwrap(await loadOrCreateEtudeParams(db, 'user-54'))
+    // First update succeeds, version increments.
+    const firstUpdate = unwrap(
+      await updateEtudeSetup(db, 'user-54', before.aggregateEpoch, before.workflowVersion, validSetup),
+    )
+
+    // Resubmit the exact same values but with the stale version.
+    const result = await updateEtudeSetup(
+      db,
+      'user-54',
+      firstUpdate.aggregateEpoch,
+      before.workflowVersion,
+      validSetup,
+    )
+
+    expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('version-mismatch')
+    }
+    const reloaded = unwrap(await loadEtudeParams(db, 'user-54'))
+    expect(reloaded?.workflowVersion).toBe(firstUpdate.workflowVersion)
   })
 })

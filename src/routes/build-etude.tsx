@@ -38,6 +38,7 @@ import { validateSetup, SUPPORTED_METERS, SUPPORTED_HANDS } from '../lib/setup-v
 import { SUPPORTED_KEYS, deriveKeyPitches } from '../lib/key-domain'
 import { OCTAVE_MIN, OCTAVE_MAX, deriveAvailablePitches } from '../lib/music-domain'
 import { parseParameterForm, type FieldSpec } from '../lib/etude-form-parser'
+import { parseWorkflowVersionField } from '../lib/workflow-version-field'
 import { redirectWithError, redirectWithMessage } from '../lib/redirects'
 import { shapeRedisplayPayload, type FieldError } from '../lib/safe-redisplay'
 import { redirectWithValidationState, consumeValidationStateFromRequest } from '../lib/validation-state-helpers'
@@ -470,6 +471,24 @@ export const buildEtude = (app: Hono<{ Bindings: Bindings }>): void => {
           form.append(key, typeof value === 'string' ? value : String(value))
         }
       }
+
+      // Parse the hidden workflowVersion field before the parameter-form
+      // parser — it is not part of SETUP_FIELD_SPEC because it is a
+      // concurrency token, not a user-visible parameter. A missing, empty,
+      // non-numeric, or tampered value is a safe stale-form rejection.
+      const rawWorkflowVersion = form.get('workflowVersion')
+      const versionParseResult = parseWorkflowVersionField(
+        typeof rawWorkflowVersion === 'string' ? rawWorkflowVersion : null,
+        'workflowVersion',
+      )
+      if (versionParseResult.isErr) {
+        return redirectWithError(
+          c,
+          PATHS.ETUDE_SETUP,
+          'Your setup could not be saved because the form was stale. Please review the current values and try again.',
+        )
+      }
+
       const parseResult = parseParameterForm(form, SETUP_FIELD_SPEC)
       if (parseResult.isErr) {
         // Collect the parse failures as field-addressable errors and the
@@ -507,9 +526,10 @@ export const buildEtude = (app: Hono<{ Bindings: Bindings }>): void => {
       }
 
       // Load the current aggregate to obtain the current epoch for the
-      // conditional update. The version and epoch are read from the stored
-      // aggregate, not from the form — the hidden workflowVersion field is
-      // emitted for Issue 10's compare-and-set, not trusted here.
+      // conditional update. The workflowVersion is taken from the form
+      // (parsed above), not from the stored aggregate — this is the
+      // compare-and-set token that prevents stale submissions from
+      // overwriting newer decisions.
       const loadResult = await loadEtudeParams(db, user.id)
       if (loadResult.isErr) {
         logError('etude setup post load failed', { error: sanitizeError(loadResult.error) })
@@ -524,14 +544,25 @@ export const buildEtude = (app: Hono<{ Bindings: Bindings }>): void => {
         db,
         user.id,
         loadResult.value.aggregateEpoch,
+        versionParseResult.value,
         validation.value,
       )
       if (updateResult.isErr) {
-        // Epoch mismatch or DB failure: safe generic error, no internal detail.
+        if (!updateResult.isOk) {
+          // Distinguish the typed conflict kinds. Both version-mismatch and
+          // epoch-mismatch are stale-form rejections: redirect with an
+          // explanatory error so the GET redisplays the committed aggregate
+          // (the newly current saved state), NOT the submitted values. A
+          // db-error is a transient failure handled via the error path.
+          if (updateResult.error.kind === 'db-error') {
+            logError('etude setup post db error', { error: sanitizeError(updateResult.error.error) })
+            return handleUnexpectedError(c as unknown as Context<AppEnv>, updateResult.error.error)
+          }
+        }
         return redirectWithError(
           c,
           PATHS.ETUDE_SETUP,
-          'Your setup could not be saved. Please try again.',
+          'Your setup could not be saved because the form was stale. Please review the current values and try again.',
         )
       }
 

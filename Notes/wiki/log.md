@@ -206,3 +206,28 @@ New test files:
 - `e2e-tests/etude/11-etude-setup-error-summary.spec.ts` — 10 Playwright tests covering error summary focus, link targets, form accessibility, native constraints, aria-describedby wiring, unique anchor ids, group-level errors, id uniqueness, no-summary-when-valid, and multi-error ordering.
 
 Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`.
+
+## [2026-08-07] ingest | issue-010 workflow version stale submission
+
+Ingested the optimistic concurrency control for workflow submissions — the `workflowVersion` compare-and-set token and the `aggregateEpoch` precondition check (issue #10).
+
+New source files:
+- `src/lib/workflow-version-field.ts` — pure parser for the hidden `workflowVersion` form field; accepts non-negative integer strings, rejects missing/empty/non-numeric/negative/non-integer/tampered values with a field-addressable `ParseFailure`.
+- `src/lib/operation-precondition.ts` — pure precondition checker for operation POSTs; verifies the workflow version (checked but never incremented) and the aggregate epoch before any lock/external call/state change; returns a typed `OperationPreconditionFailure` (`version-mismatch` or `epoch-mismatch`).
+- `src/routes/test/etude-operation-precondition.ts` — test-only `POST /test/etude/operation-precondition` route exercising the precondition gate; gated by `isTestRouteEnabled` and `PRODUCTION:REMOVE` markers.
+
+Modified source files:
+- `src/lib/etude-params-repository.ts` — `updateEtudeSetup` now takes `expectedWorkflowVersion` and checks it in the `where` clause alongside `aggregateEpoch`; returns a typed `EtudeUpdateError` (`version-mismatch`, `epoch-mismatch`, or `db-error`) instead of a generic `Error`; no longer uses `withRetry` (CAS conflicts are deterministic); the identical-resubmit no-op path now verifies the version matches before returning Ok.
+- `src/routes/build-etude.tsx` — the setup POST handler now parses the `workflowVersion` field from the form via `parseWorkflowVersionField`, passes the parsed version to `updateEtudeSetup`, and on a typed `version-mismatch`/`epoch-mismatch` redirects with `redirectWithError` (NOT validation-state redisplay) so the GET shows the committed aggregate, not the submitted values.
+- `src/index.ts` — mounted the test-only operation-precondition route under the test-route flag.
+
+New test files:
+- `tests/workflow-version-field.spec.ts` — 12 tests covering valid inputs, invalid inputs, and field-name parameterization.
+- `tests/operation-precondition.spec.ts` — 11 tests covering matching version/epoch, version mismatch (stale/missing/non-numeric/negative/newer), epoch mismatch, and purity.
+- `e2e-tests/etude/12-etude-setup-stale-version.spec.ts` — 1 Playwright two-tab test for setup parameter-form stale-version rejection.
+- `e2e-tests/etude/13-etude-operation-precondition-stale.spec.ts` — 1 Playwright two-tab test for operation-POST precondition refusal.
+
+Modified test files:
+- `tests/etude-params-repository.spec.ts` — 5 new tests for the workflowVersion CAS (matching version succeeds, older version rejected, newer version rejected, concurrent updates, identical resubmit with stale version); existing tests updated to the new `expectedWorkflowVersion` parameter and typed `EtudeUpdateError` assertions.
+
+Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`, `project-overview.md`.

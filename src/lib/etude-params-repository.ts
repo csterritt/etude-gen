@@ -206,51 +206,73 @@ const loadEtudeParamsActual = async (
 }
 
 /**
+ * Typed conflict returned by `updateEtudeSetup`. The caller distinguishes
+ * stale-version rejections (`version-mismatch`) from epoch-mismatch rejections
+ * (`epoch-mismatch`) and from transient DB failures (`db-error`). A
+ * version-mismatch or epoch-mismatch is deterministic and must not be retried;
+ * a db-error is transient and may be retried by the caller if appropriate.
+ */
+export type EtudeUpdateError =
+  | { kind: 'version-mismatch' }
+  | { kind: 'epoch-mismatch' }
+  | { kind: 'db-error'; error: Error }
+
+/**
  * Conditionally update the setup-step fields of the owner's aggregate.
  *
- * Verifies the aggregate epoch at commit (cross-cutting contract section 4):
- * the `where` clause matches both `userId` and `aggregateEpoch ===
- * expectedEpoch`, so a request whose captured epoch no longer matches the
- * stored value updates zero rows and returns `Result.err`. On success the
- * same committed transition increments `workflowVersion` by 1, sets
- * `setupConfirmed` to true, and updates the measure/meter/hand columns.
- * Never read-then-unconditionally-write.
+ * Verifies both the aggregate epoch and the workflow version at commit
+ * (cross-cutting contract sections 2 and 4): the `where` clause matches
+ * `userId`, `aggregateEpoch === expectedEpoch`, and `workflowVersion ===
+ * expectedWorkflowVersion`, so a request whose captured epoch or version no
+ * longer matches the stored values updates zero rows and returns a typed
+ * conflict. On success the same committed transition increments
+ * `workflowVersion` by 1, sets `setupConfirmed` to true, and updates the
+ * measure/meter/hand/key/octaves columns. Never read-then-unconditionally-write.
+ *
+ * CAS conflicts (`version-mismatch`, `epoch-mismatch`) are deterministic and
+ * are not retried — `withRetry` is not used because it would retry a conflict
+ * that will deterministically fail again, and because it would lose the typed
+ * conflict information. Transient DB errors are wrapped as `db-error`.
  * @param db - Database instance
  * @param userId - Authenticated owner user id
  * @param expectedEpoch - Aggregate epoch captured at acquisition
+ * @param expectedWorkflowVersion - Workflow version captured from the form
  * @param values - Validated setup values from the domain validator
- * @returns Promise<Result<EtudeParams, Error>> — epoch mismatch is reported
- * as a generic Error to avoid leaking internal state; the caller treats all
- * failures as a safe retry-the-form rejection.
+ * @returns Promise<Result<EtudeParams, EtudeUpdateError>> — conflict kinds are
+ * `version-mismatch`, `epoch-mismatch`, or `db-error`; the caller treats
+ * `version-mismatch` and `epoch-mismatch` as safe stale-form rejections.
  */
 export const updateEtudeSetup = (
   db: DrizzleClient,
   userId: string,
   expectedEpoch: number,
+  expectedWorkflowVersion: number,
   values: ValidSetup,
-): Promise<Result<EtudeParams, Error>> =>
-  withRetry('updateEtudeSetup', () => updateEtudeSetupActual(db, userId, expectedEpoch, values))
+): Promise<Result<EtudeParams, EtudeUpdateError>> =>
+  updateEtudeSetupActual(db, userId, expectedEpoch, expectedWorkflowVersion, values)
 
 const updateEtudeSetupActual = async (
   db: DrizzleClient,
   userId: string,
   expectedEpoch: number,
+  expectedWorkflowVersion: number,
   values: ValidSetup,
-): Promise<Result<EtudeParams, Error>> => {
+): Promise<Result<EtudeParams, EtudeUpdateError>> => {
   try {
     // Load the current aggregate to compare the submitted values against
     // the stored ones. When every submitted value is identical to the
-    // stored values, the request is a no-op: no version increment, no
-    // write, no flag changes. This avoids spurious version bumps from a
-    // double submission of the same form.
+    // stored values AND the expected version matches, the request is a
+    // no-op: no version increment, no write, no flag changes. This avoids
+    // spurious version bumps from a double submission of the same form.
+    // A stale version on an identical resubmit is still a version-mismatch.
     const current = await db
       .select()
       .from(etudeParams)
       .where(eq(etudeParams.userId, userId))
       .limit(1)
     if (current.length === 0) {
-      // No aggregate exists for this owner; treat as a safe rejection.
-      return Result.err(new Error('epoch-mismatch'))
+      // No aggregate exists for this owner; treat as a safe version-mismatch.
+      return Result.err({ kind: 'version-mismatch' })
     }
     const stored = current[0]!
     const submittedOctavesString = values.octaves.join(',')
@@ -261,6 +283,11 @@ const updateEtudeSetupActual = async (
       stored.keySignature === values.keySignature &&
       stored.selectedOctaves === submittedOctavesString
     if (identicalResubmit) {
+      // Verify the version matches before returning Ok. A stale version on
+      // an identical resubmit is a version-mismatch, not a silent success.
+      if (stored.workflowVersion !== expectedWorkflowVersion) {
+        return Result.err({ kind: 'version-mismatch' })
+      }
       return Result.ok(mapToDomain(stored))
     }
 
@@ -285,16 +312,33 @@ const updateEtudeSetupActual = async (
         updatedAt: new Date(),
       })
       .where(
-        and(eq(etudeParams.userId, userId), eq(etudeParams.aggregateEpoch, expectedEpoch)),
+        and(
+          eq(etudeParams.userId, userId),
+          eq(etudeParams.aggregateEpoch, expectedEpoch),
+          eq(etudeParams.workflowVersion, expectedWorkflowVersion),
+        ),
       )
       .returning()
     if (updated.length === 0) {
-      // Either no aggregate exists for this owner, or the epoch no longer
-      // matches. Both are safe rejections, never a 500.
-      return Result.err(new Error('epoch-mismatch'))
+      // The CAS failed: either the epoch or the version no longer matches.
+      // Re-load the current row to disambiguate the conflict kind so the
+      // caller can report the correct failure. If the row is gone, treat it
+      // as a version-mismatch (a safe conflict, never a 500).
+      const reloaded = await db
+        .select()
+        .from(etudeParams)
+        .where(eq(etudeParams.userId, userId))
+        .limit(1)
+      if (reloaded.length === 0) {
+        return Result.err({ kind: 'version-mismatch' })
+      }
+      if (reloaded[0]!.aggregateEpoch !== expectedEpoch) {
+        return Result.err({ kind: 'epoch-mismatch' })
+      }
+      return Result.err({ kind: 'version-mismatch' })
     }
     return Result.ok(mapToDomain(updated[0]!))
   } catch (e) {
-    return Result.err(e instanceof Error ? e : new Error(String(e)))
+    return Result.err({ kind: 'db-error', error: e instanceof Error ? e : new Error(String(e)) })
   }
 }

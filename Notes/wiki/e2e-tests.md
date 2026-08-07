@@ -146,3 +146,15 @@ A catalog and summaries of all end-to-end tests under `e2e-tests/`.
 
 - No error summary element renders when the submission is valid (clean step).
 - Multiple invalid fields each produce a summary entry, and the entries are ordered by field appearance (measures before meter).
+
+## etude/12-etude-setup-stale-version.spec.ts
+
+1 Playwright test covering the setup parameter-form stale-version rejection from Issue 10 (two-tab scenario):
+
+- Two browser tabs load `/etude/setup` (both see version 1); tab A submits a change (measures 16, meter 3/4, hands both) and succeeds (version becomes 2); tab B submits a different change (measures 12) carrying the stale version 1 and is rejected with a 303 to `/etude/setup`; on reload tab B sees the newly current saved state (tab A's values: measures 16, meter 3/4, hands both) with an explanatory error, NOT tab B's submitted values (measures 12). The workflow version field on the redisplayed page shows `2`.
+
+## etude/13-etude-operation-precondition-stale.spec.ts
+
+1 Playwright test covering the operation-POST precondition refusal from Issue 10 (two-tab scenario):
+
+- Two browser tabs load `/etude/setup` (both see version 1); tab A submits a setup change (version becomes 2); tab B POSTs to the test-only operation route (`POST /test/etude/operation-precondition`) carrying the stale version 1 and the captured epoch 1; the route refuses with a 303 to the canonical route (`/etude/setup`) with an explanatory error, having acquired no lock, made no external call, and changed no state. The aggregate is unchanged (still tab A's values, version still 2).

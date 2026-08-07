@@ -88,7 +88,7 @@ A catalog and summaries of all unit tests under `tests/`.
 
 ## etude-params-repository.spec.ts
 
-28 tests covering `loadOrCreateEtudeParams`, `loadEtudeParams`, and `updateEtudeSetup` from `src/lib/etude-params-repository.ts`, using the `tests/helpers/test-db.ts` real-SQLite helper:
+33 tests covering `loadOrCreateEtudeParams`, `loadEtudeParams`, and `updateEtudeSetup` from `src/lib/etude-params-repository.ts`, using the `tests/helpers/test-db.ts` real-SQLite helper:
 
 - Creates one record with the default values (8 measures, 4/4, C major, selected octaves `'4'`, octave range 4, right hand, `workflowVersion` 1, `aggregateEpoch` 1) for a new user.
 - Does not create a second record on a second call and returns the same aggregate (idempotent).
@@ -118,6 +118,32 @@ A catalog and summaries of all unit tests under `tests/`.
 - `updateEtudeSetup` does not increment the workflow version when all five fields are identical to the stored ones.
 - `updateEtudeSetup` clears the flags when both key and octaves change.
 - `updateEtudeSetup` still rejects an epoch mismatch and performs no octave invalidation.
+- `updateEtudeSetup` succeeds and increments the version when the expected version matches the stored version (Issue 10 workflowVersion CAS).
+- `updateEtudeSetup` rejects with a typed `version-mismatch` when the expected version is older than the stored version and persists nothing.
+- `updateEtudeSetup` rejects with a typed `version-mismatch` when the expected version is newer than the stored version and persists nothing.
+- `updateEtudeSetup` rejects at most one of two concurrent `Promise.all` updates with the same expected version (the loser gets a typed `version-mismatch`).
+- `updateEtudeSetup` rejects an identical resubmit with a stale version as a `version-mismatch` (no silent success on a stale token).
+
+## workflow-version-field.spec.ts
+
+12 tests covering `parseWorkflowVersionField` from `src/lib/workflow-version-field.ts` (Issue 10):
+
+- Accepts valid non-negative integer strings (`"1"`, `"42"`, `"0"`) and returns Ok with the parsed integer.
+- Accepts a value with surrounding whitespace and trims it (`"  3  "` → `3`).
+- Rejects a missing value (undefined, null), an empty string, a non-numeric string (`"abc"`), a negative number (`"-1"`), a non-integer (`"1.5"`), and a tampered value (`"1abc"`) — each with a `ParseFailure` naming the field.
+- Uses the provided field name in the `ParseFailure` (parameterized, not hardcoded).
+
+## operation-precondition.spec.ts
+
+11 tests covering `checkOperationPrecondition` from `src/lib/operation-precondition.ts` (Issue 10):
+
+- Returns Ok with the parsed workflow version when both version and epoch match.
+- Rejects a stale version (submitted 1 when current is 2) as `version-mismatch`.
+- Rejects a missing version (empty string), a non-numeric version (`"abc"`), a negative version (`"-1"`), and a newer-than-current version (submitted 3 when current is 2) — all as `version-mismatch`.
+- Rejects a matching version but stale epoch as `epoch-mismatch`.
+- Rejects a matching version but newer epoch as `epoch-mismatch`.
+- Does not mutate the current aggregate argument (purity).
+- Does not throw for any hostile input (purity).
 
 ## key-domain.spec.ts
 

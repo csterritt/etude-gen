@@ -277,3 +277,30 @@ New test files:
 - `tests/health-route-catalog.spec.ts` — 10 tests covering `buildCatalogHealthContribution` and its integration with `runHealthCheck`, `buildAnonymousLiveness`, and `buildDetailedReport` (healthy/corrupted catalog, aggregate defects, anonymous payload leaks nothing, detailed report names meter and line without secrets).
 
 Wiki pages updated: `source-code.md`, `unit-tests.md`, `project-overview.md`.
+
+## [2026-08-07] ingest | issue-013 notes step pitch selection
+
+Ingested the notes-step pitch selection: the pitch-selection validator and resolver, the `updateEtudePitches` repository function, the canonical-route notes-step extension, the notes route handlers, and the new test files (issue #13).
+
+New source files:
+- `src/lib/pitch-selection-validator.ts` — `validatePitchSelection` (cardinality rules with exact two-hand message, unavailable-pitch rejection, hostile-shape tolerance) and `resolvePitchSelectionState` (first-derivation all-selected default, non-re-expansion, re-derivation after Issue 11 clear); pure functions, no DB, no throws.
+- `src/routes/build-etude-notes.tsx` — `GET /etude/notes` renders the pitch checkbox form (available pitches derived from stored key+octaves, first-derivation or stored selection, error-summary wiring); `POST /etude/notes` handles ordinary save (cardinality validation, CAS persistence) and Select all (ignores checkboxes, persists all available pitches).
+
+Modified source files:
+- `src/constants.ts` — added `PATHS.ETUDE_NOTES: '/etude/notes'`.
+- `src/lib/music-domain.ts` — added `parseStoredOctaves` (shared by setup and notes routes).
+- `src/lib/etude-params-repository.ts` — added `updateEtudePitches` (CAS persistence of `selectedPitches`, version increment, identical-resubmit short-circuit, stale-version/epoch-mismatch rejection; does not set `notesConfirmed`).
+- `src/lib/canonical-route.ts` — extended `resolveCanonicalRoute` to return `/etude/notes` when `setupConfirmed && !notesConfirmed`.
+- `src/routes/build-etude.tsx` — imports `parseStoredOctaves` from `music-domain` (removed local duplicate).
+- `src/index.ts` — mounted `buildEtudeNotes(app)`.
+
+New test files:
+- `tests/pitch-selection-validator.spec.ts` — 28 tests covering `validatePitchSelection` (cardinality, unavailable-pitch rejection, hostile-shape tolerance, deduplication, reordering, purity) and `resolvePitchSelectionState` (first-derivation, non-re-expansion, re-derivation after clear, trimming, ordering, purity).
+- `e2e-tests/etude/15-etude-notes-pitch-selection.spec.ts` — 8 Playwright tests covering default all-selected state, Select all without scripting, two-hand and one-hand cardinality failures, persistence of narrowed selection, non-re-expansion, stale-version rejection, redisplay with cardinality error, and error-summary linking into the pitch group.
+
+Modified test files:
+- `tests/etude-params-repository.spec.ts` — 7 new tests for `updateEtudePitches` (persistence, version increment, stale-version/epoch-mismatch rejection, db-error handling, identical-resubmit no-op, second-save increment, no-aggregate version-mismatch); added `confirmSetup` helper.
+- `tests/canonical-route.spec.ts` — 4 new tests for the notes-step row (setup confirmed + notes unconfirmed → /etude/notes; pitches saved but durations unconfirmed → still /etude/notes; notes confirmed → past /etude/notes; setup unconfirmed → still /etude/setup).
+- `e2e-tests/etude/13-etude-operation-precondition-stale.spec.ts` — updated the expected canonical route from `/etude/setup` to `/etude/notes` after setup is confirmed (the notes step now exists).
+
+Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`, `project-overview.md`.

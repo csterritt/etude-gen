@@ -36,7 +36,7 @@ import { handleUnexpectedError } from './build-safe-error'
 import { logError, sanitizeError } from '../lib/logger'
 import { validateSetup, SUPPORTED_METERS, SUPPORTED_HANDS } from '../lib/setup-validator'
 import { SUPPORTED_KEYS, deriveKeyPitches } from '../lib/key-domain'
-import { OCTAVE_MIN, OCTAVE_MAX, deriveAvailablePitches } from '../lib/music-domain'
+import { OCTAVE_MIN, OCTAVE_MAX, deriveAvailablePitches, parseStoredOctaves } from '../lib/music-domain'
 import { parseParameterForm, type FieldSpec } from '../lib/etude-form-parser'
 import { parseWorkflowVersionField } from '../lib/workflow-version-field'
 import { redirectWithError, redirectWithMessage } from '../lib/redirects'
@@ -79,20 +79,6 @@ const SETUP_FIELD_ORDER = ['measures', 'meter', 'hands', 'key', 'octaves'] as co
  */
 const SETUP_GROUP_FIELDS = {
   octaves: { firstMemberId: 'octaves-field-2' },
-}
-
-/**
- * Parse the stored `selectedOctaves` comma-separated string into a sorted
- * `number[]` for form pre-selection and available-pitch derivation. Falls
- * back to `[4]` (the default) when the string is empty or unparseable.
- */
-const parseStoredOctaves = (stored: string): number[] => {
-  const parts = stored.split(',').map((s) => s.trim()).filter((s) => s !== '')
-  const nums = parts.map(Number).filter((n) => Number.isInteger(n))
-  if (nums.length === 0) {
-    return [4]
-  }
-  return nums.sort((a, b) => a - b)
 }
 
 /**

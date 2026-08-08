@@ -334,3 +334,41 @@ The catalog contribution built from the real packaged catalog by `buildCatalogHe
 - Contains a `.focus()` call on the resolved element.
 - Guards against the element being null or undefined so it cannot throw (the `.focus()` call is inside an `if` guard).
 - Does not reference any field name, submitted value, or error text — only the summary id.
+
+## pitch-selection-validator.spec.ts
+
+28 tests covering `validatePitchSelection` and `resolvePitchSelectionState` from `src/lib/pitch-selection-validator.ts` (Issue 13):
+
+- `validatePitchSelection` purity: does not mutate arguments or throw.
+- One-hand mode: zero pitches rejected, one pitch accepted, multiple pitches accepted.
+- Two-hand mode: zero pitches rejected, one pitch rejected with the exact message "Select at least two pitches when using both hands.", two pitches accepted.
+- Unavailable-pitch rejection: a submitted pitch not in the available set is rejected with a failure naming the pitch; an available pitch is accepted.
+- Deduplication: duplicate submitted pitches are deduplicated to a single entry.
+- Reordering: reordered submitted pitches are normalized to available-set order.
+- Hostile-shape tolerance: null, undefined, a string, and a number are each rejected without throwing; non-string array elements are stringified and trimmed; an empty available set rejects any submission; two-hand mode with only one available pitch is rejected.
+- `resolvePitchSelectionState` purity: does not mutate arguments or throw.
+- First-derivation: null stored pitches preselects all available pitches with `isFirstDerivation: true`; empty and whitespace-only strings are treated as null.
+- Non-re-expansion: a stored narrowed selection is shown as-is; a single-pitch selection is shown as-is.
+- Re-derivation after Issue 11 clear: unavailable stored pitches are filtered out, available ones retained; all stored pitches unavailable yields an empty selection (not first derivation).
+- Trimming and ordering: stored pitches with surrounding whitespace are trimmed; stored pitches are ordered by available-set position.
+
+## canonical-route.spec.ts (Issue 13 additions)
+
+4 new tests covering the notes-step row of the canonical route resolver:
+
+- Routes to `/etude/notes` when setup is confirmed and notes are unconfirmed.
+- Routes to `/etude/notes` when pitches are saved but durations are not yet confirmed (notes step is not complete until both halves are confirmed).
+- Routes past `/etude/notes` when notes are confirmed (one hand, no split needed) — does not route to `/etude/notes`.
+- Still routes to `/etude/setup` when setup is not confirmed even if notes are confirmed.
+
+## etude-params-repository.spec.ts (Issue 13 additions)
+
+7 new tests covering `updateEtudePitches` from `src/lib/etude-params-repository.ts`:
+
+- Persists `selectedPitches` and increments the workflow version; `setupConfirmed` stays true, `notesConfirmed` stays false (durations are Issue 14), and other downstream state is unchanged.
+- Rejects a stale workflow version and persists nothing.
+- Rejects a stale epoch and persists nothing.
+- Wraps an injected update failure as a `db-error` and persists nothing.
+- An identical resubmit is a no-op (no version increment, no write).
+- Saving a different pitch set after a prior save updates and increments again.
+- Returns `version-mismatch` when no aggregate exists for the owner.

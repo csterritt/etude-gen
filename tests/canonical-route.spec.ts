@@ -41,4 +41,35 @@ describe('resolveCanonicalRoute', () => {
     const params = baseParams({ setupConfirmed: false })
     expect(resolveCanonicalRoute(params)).toBe('/etude/setup')
   })
+
+  it('routes to /etude/notes when setup is confirmed and notes are unconfirmed', () => {
+    const params = baseParams({ setupConfirmed: true, notesConfirmed: false })
+    expect(resolveCanonicalRoute(params)).toBe('/etude/notes')
+  })
+
+  it('routes to /etude/notes when pitches are saved but durations are not yet confirmed', () => {
+    const params = baseParams({
+      setupConfirmed: true,
+      notesConfirmed: false,
+      selectedPitches: 'C4,D4',
+    })
+    expect(resolveCanonicalRoute(params)).toBe('/etude/notes')
+  })
+
+  it('routes past /etude/notes when notes are confirmed (one hand, no split needed)', () => {
+    const params = baseParams({
+      setupConfirmed: true,
+      notesConfirmed: true,
+      hand: 'right',
+    })
+    // The split/review/score rows are later issues — the resolver currently
+    // falls through to /etude/setup as a stub for post-notes states. The
+    // important assertion is that it does NOT route to /etude/notes.
+    expect(resolveCanonicalRoute(params)).not.toBe('/etude/notes')
+  })
+
+  it('still routes to /etude/setup when setup is not confirmed even if notes are confirmed', () => {
+    const params = baseParams({ setupConfirmed: false, notesConfirmed: true })
+    expect(resolveCanonicalRoute(params)).toBe('/etude/setup')
+  })
 })

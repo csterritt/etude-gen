@@ -18,6 +18,7 @@ import {
   loadOrCreateEtudeParams,
   loadEtudeParams,
   updateEtudeSetup,
+  updateEtudePitches,
   type EtudeParams,
 } from '../src/lib/etude-params-repository'
 import type { ValidSetup } from '../src/lib/setup-validator'
@@ -1039,5 +1040,202 @@ describe('updateEtudeSetup full dependent-downstream invalidation (Issue 11)', (
     expect(reloaded?.notesConfirmed).toBe(true)
     expect(reloaded?.splitConfirmed).toBe(true)
     expect(reloaded?.workflowVersion).toBe(before.workflowVersion)
+  })
+})
+
+/**
+ * Confirm the setup step by calling updateEtudeSetup with validSetup and the
+ * current epoch/version, so the notes step (which requires setupConfirmed) is
+ * reachable. Returns the post-update aggregate.
+ */
+const confirmSetup = async (db: DrizzleClient, userId: string): Promise<EtudeParams> => {
+  const before = unwrap(await loadOrCreateEtudeParams(db, userId))
+  return unwrap(
+    await updateEtudeSetup(db, userId, before.aggregateEpoch, before.workflowVersion, validSetup),
+  )
+}
+
+describe('updateEtudePitches', () => {
+  it('persists selectedPitches and increments the workflow version', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-100', 'onehundred@example.com')
+    const confirmed = await confirmSetup(db, 'user-100')
+    const versionBefore = confirmed.workflowVersion
+
+    const result = await updateEtudePitches(
+      db,
+      'user-100',
+      confirmed.aggregateEpoch,
+      confirmed.workflowVersion,
+      ['C4', 'D4', 'E4'],
+    )
+
+    const after = unwrap(result)
+    expect(after.selectedPitches).toBe('C4,D4,E4')
+    expect(after.workflowVersion).toBe(versionBefore + 1)
+    expect(after.setupConfirmed).toBe(true)
+    // notesConfirmed stays false — durations are Issue 14.
+    expect(after.notesConfirmed).toBe(false)
+    // Other downstream state is unchanged.
+    expect(after.selectedDurations).toBe(confirmed.selectedDurations)
+    expect(after.splitBoundary).toBe(confirmed.splitBoundary)
+    expect(after.splitConfirmed).toBe(confirmed.splitConfirmed)
+  })
+
+  it('rejects a stale workflow version and persists nothing', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-101', 'onehundredone@example.com')
+    const confirmed = await confirmSetup(db, 'user-101')
+
+    const staleVersion = confirmed.workflowVersion - 1
+    const result = await updateEtudePitches(
+      db,
+      'user-101',
+      confirmed.aggregateEpoch,
+      staleVersion,
+      ['C4', 'D4'],
+    )
+
+    expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('version-mismatch')
+    }
+    // Reload and confirm nothing changed.
+    const reloaded = unwrap(await loadEtudeParams(db, 'user-101'))
+    expect(reloaded?.selectedPitches).toBeNull()
+    expect(reloaded?.workflowVersion).toBe(confirmed.workflowVersion)
+  })
+
+  it('rejects a stale epoch and persists nothing', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-102', 'onehundredtwo@example.com')
+    const confirmed = await confirmSetup(db, 'user-102')
+
+    const staleEpoch = confirmed.aggregateEpoch - 1
+    const result = await updateEtudePitches(
+      db,
+      'user-102',
+      staleEpoch,
+      confirmed.workflowVersion,
+      ['C4', 'D4'],
+    )
+
+    expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('epoch-mismatch')
+    }
+    const reloaded = unwrap(await loadEtudeParams(db, 'user-102'))
+    expect(reloaded?.selectedPitches).toBeNull()
+    expect(reloaded?.workflowVersion).toBe(confirmed.workflowVersion)
+  })
+
+  it('wraps an injected update failure as a db-error and persists nothing', async () => {
+    const realDb = createTestDb()
+    await insertUser(realDb, 'user-103', 'onehundredthree@example.com')
+    const confirmed = await confirmSetup(realDb, 'user-103')
+    // First save a pitch selection on the real DB so we can confirm the
+    // injected failure does not clobber it.
+    const firstSave = unwrap(
+      await updateEtudePitches(
+        realDb,
+        'user-103',
+        confirmed.aggregateEpoch,
+        confirmed.workflowVersion,
+        ['C4', 'D4'],
+      ),
+    )
+
+    // Build a DrizzleClient wrapper whose update throws.
+    const throwingDb = {
+      ...realDb,
+      update: () => {
+        throw new Error('injected update failure')
+      },
+    } as unknown as DrizzleClient
+
+    const result = await updateEtudePitches(
+      throwingDb,
+      'user-103',
+      firstSave.aggregateEpoch,
+      firstSave.workflowVersion,
+      ['C4', 'D4', 'E4'],
+    )
+
+    expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('db-error')
+    }
+    // Confirm via the real client that nothing was persisted.
+    const reloaded = unwrap(await loadEtudeParams(realDb, 'user-103'))
+    expect(reloaded?.selectedPitches).toBe('C4,D4')
+    expect(reloaded?.workflowVersion).toBe(firstSave.workflowVersion)
+  })
+
+  it('an identical resubmit is a no-op (no version increment, no write)', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-104', 'onehundredfour@example.com')
+    const confirmed = await confirmSetup(db, 'user-104')
+    const firstSave = unwrap(
+      await updateEtudePitches(
+        db,
+        'user-104',
+        confirmed.aggregateEpoch,
+        confirmed.workflowVersion,
+        ['C4', 'D4'],
+      ),
+    )
+    const versionAfterFirstSave = firstSave.workflowVersion
+
+    // Resubmit the exact same pitches with the current version.
+    const result = await updateEtudePitches(
+      db,
+      'user-104',
+      firstSave.aggregateEpoch,
+      firstSave.workflowVersion,
+      ['C4', 'D4'],
+    )
+
+    const after = unwrap(result)
+    expect(after.selectedPitches).toBe('C4,D4')
+    expect(after.workflowVersion).toBe(versionAfterFirstSave)
+  })
+
+  it('saving a different pitch set after a prior save updates and increments again', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-105', 'onehundredfive@example.com')
+    const confirmed = await confirmSetup(db, 'user-105')
+    const firstSave = unwrap(
+      await updateEtudePitches(
+        db,
+        'user-105',
+        confirmed.aggregateEpoch,
+        confirmed.workflowVersion,
+        ['C4', 'D4'],
+      ),
+    )
+    const versionAfterFirstSave = firstSave.workflowVersion
+
+    const result = await updateEtudePitches(
+      db,
+      'user-105',
+      firstSave.aggregateEpoch,
+      firstSave.workflowVersion,
+      ['C4', 'D4', 'E4', 'F4'],
+    )
+
+    const after = unwrap(result)
+    expect(after.selectedPitches).toBe('C4,D4,E4,F4')
+    expect(after.workflowVersion).toBe(versionAfterFirstSave + 1)
+  })
+
+  it('returns version-mismatch when no aggregate exists for the owner', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-106', 'onehundredsix@example.com')
+    // No aggregate created — call updateEtudePitches directly.
+    const result = await updateEtudePitches(db, 'user-106', 1, 1, ['C4'])
+    expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('version-mismatch')
+    }
   })
 })

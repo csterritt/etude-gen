@@ -3989,6 +3989,10 @@
       --size: calc(var(--size-field, 0.25rem) * 8);
     }
   }
+  .select-all {
+    -webkit-user-select: all;
+    user-select: all;
+  }
   @layer daisyui.l1.l2.l3 {
     .aura:has( > .card,  > .alert) {
       --aura-radius: var(--radius-box);

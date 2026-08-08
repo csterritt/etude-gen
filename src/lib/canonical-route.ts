@@ -37,6 +37,14 @@ export const resolveCanonicalRoute = (params: EtudeParams | null): string => {
     return PATHS.ETUDE_SETUP
   }
 
-  // Later issues extend this resolver for the notes/split/review/score rows.
+  // Setup is confirmed. The notes step is the earliest incomplete step when
+  // pitches or durations are unconfirmed (cross-cutting contract section 5:
+  // the notes step is one coherent prerequisite — both halves must be
+  // confirmed for it to count as complete).
+  if (!params.notesConfirmed) {
+    return PATHS.ETUDE_NOTES
+  }
+
+  // Later issues extend this resolver for the split/review/score rows.
   return PATHS.ETUDE_SETUP
 }

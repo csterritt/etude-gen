@@ -7,6 +7,7 @@ import { TEST_USERS, SERVER_BASE_URL } from '../support/test-data'
 
 const ETUDE_PATH = '/etude'
 const ETUDE_SETUP_PATH = '/etude/setup'
+const ETUDE_NOTES_PATH = '/etude/notes'
 
 /**
  * Submit a multipart POST to the test-only operation-precondition route
@@ -65,14 +66,15 @@ test.describe('POST /test/etude/operation-precondition stale-version refusal (tw
 
       // Tab B: POST to the test-only operation-precondition route carrying
       // the stale version 1 and the captured epoch 1. This must be refused
-      // with a 303 to the canonical route (/etude/setup), no state change.
+      // with a 303 to the canonical route — now /etude/notes since setup is
+      // confirmed and notes are not — no state change.
       const response = await postOperationPrecondition(tabB, {
         workflowVersion: '1',
         aggregateEpoch: '1',
       })
 
       expect(response.status()).toBe(303)
-      expect(response.headers()['location']).toContain(ETUDE_SETUP_PATH)
+      expect(response.headers()['location']).toContain(ETUDE_NOTES_PATH)
 
       // Tab B: navigate to /etude/setup and confirm the aggregate is
       // unchanged — still Tab A's values, version still 2.

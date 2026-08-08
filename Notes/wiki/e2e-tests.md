@@ -165,3 +165,16 @@ A catalog and summaries of all end-to-end tests under `e2e-tests/`.
 
 - Changing the key clears pitches and split, retains durations, and makes review unreachable: signs in, submits a valid setup (measures 16 to force a write), seeds downstream state via the test-only `POST /test/etude/seed-downstream-state` route (notesConfirmed, splitConfirmed, selectedPitches, selectedDurations, splitBoundary), inspects via `GET /test/etude/aggregate-state` to confirm review is reachable, then changes the key to G major via the real setup form and inspects again — selectedPitches and splitBoundary are null, selectedDurations is retained, notesConfirmed and splitConfirmed are false, isReviewReachable is false, and the workflow version incremented by 1.
 - An identical setup resubmit retains all downstream state: after seeding downstream state, resubmits the exact stored setup values via the real form and inspects — all downstream data and confirmation flags are retained, isReviewReachable is true, and the workflow version is unchanged.
+
+## etude/15-etude-notes-pitch-selection.spec.ts
+
+8 Playwright tests covering the Issue 13 notes-step pitch selection end-to-end:
+
+- A newly derived notes step has every available pitch selected by default (C major octave 4: C4 through C5, all checked).
+- Select all without scripting restores the full available pitch set: deselect several pitches, submit via the Select all button, assert a 303 redirect back to /etude/notes, and confirm every pitch is checked and the full set was persisted.
+- Two-hand mode: submitting one pitch is rejected with the exact cardinality message "Select at least two pitches when using both hands.", the error summary is present and focused, and nothing was persisted.
+- One-hand mode: submitting zero pitches is rejected with a cardinality error and nothing is persisted.
+- A narrowed selection is persisted and not re-expanded on re-render: save three pitches, reload, and confirm exactly those three are checked (not re-expanded to all).
+- A stale workflow version is rejected and the currently saved selection is shown (not the submitted stale one).
+- A rejected two-hand submission redisplays the one submitted pitch checked alongside the cardinality error, the error summary is focused, and the prior valid selection is still stored.
+- The error summary links into the pitch group: each summary entry's href resolves to an existing control and following it moves focus there.

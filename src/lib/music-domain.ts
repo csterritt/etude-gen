@@ -106,6 +106,24 @@ export interface ExpandedRange {
 }
 
 /**
+ * Parse the stored `selectedOctaves` comma-separated string into a sorted
+ * `number[]` for form pre-selection and available-pitch derivation. Falls
+ * back to `[4]` (the default) when the string is empty or unparseable.
+ * Shared by the setup and notes routes so both derive the same available
+ * pitches from the same stored octaves.
+ * @param stored - The stored `selectedOctaves` string (e.g. "4" or "2,4,6")
+ * @returns A sorted `number[]` of octave numbers, or `[4]` as a fallback
+ */
+export const parseStoredOctaves = (stored: string): number[] => {
+  const parts = stored.split(',').map((s) => s.trim()).filter((s) => s !== '')
+  const nums = parts.map(Number).filter((n) => Number.isInteger(n))
+  if (nums.length === 0) {
+    return [4]
+  }
+  return nums.sort((a, b) => a - b)
+}
+
+/**
  * Derive the contiguous expanded range from an octave selection. The min
  * and max are the lowest and highest selected octaves; every octave
  * between them is included in the expanded range regardless of whether it

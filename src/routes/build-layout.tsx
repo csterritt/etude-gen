@@ -44,7 +44,7 @@ export const useLayout = (
       <div className='navbar bg-base-100 shadow-lg'>
         <div className='navbar-start'>
           <a href={PATHS.ROOT} className='btn btn-ghost text-xl'>
-            Worker, D1, Drizzle Demo
+            Etude Music Study Generator
           </a>
         </div>
         <div className='navbar-end flex items-center'>

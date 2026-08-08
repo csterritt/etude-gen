@@ -372,3 +372,22 @@ The catalog contribution built from the real packaged catalog by `buildCatalogHe
 - An identical resubmit is a no-op (no version increment, no write).
 - Saving a different pitch set after a prior save updates and increments again.
 - Returns `version-mismatch` when no aggregate exists for the owner.
+
+## duration-selection-validator.spec.ts (Issue 14)
+
+25 tests covering the four pure functions from `src/lib/duration-selection-validator.ts` against a small synthetic catalog (2/4 patterns ER/EEEE, 3/4 pattern D, 4/4 pattern QQER):
+- `computeOfferableDurations` — returns exactly the distinct tokens per meter in canonical order (2/4 → `[R, E]`, 3/4 → `[D]`, 4/4 → `[Q, R, E]`); a token present in one meter and absent from another is offerable for the former only; no duplicates and supported tokens only; empty for an unsupported meter.
+- `validateDurationSelection` — pure (no mutation/throw); non-array (null/undefined/string/number) rejected with the empty-selection message on `'durations'`; empty/whitespace set rejected; duplicates de-duplicated and accepted; reordered submission normalized to canonical order; unknown token rejected naming the token; supported-but-not-offerable token rejected naming the token and meter; an eligible set accepted in canonical order; an only-offerable set with no eligible pattern rejected with the exact stable corrective message (naming the half duration for the 2/4 {R} case); eligibility authoritative, never a 500; unsupported meter rejected.
+- `computeCorrectiveSuggestion` — smallest addition set restoring eligibility for several meter/selection combos (2/4 {R} → `['E']`, 4/4 {E} → `['Q','R']`, 3/4 {} → `['D']`); empty when already eligible; deterministic and pure.
+- `resolveDurationSelectionState` — pure; null/empty/whitespace → all-offerable first derivation; stored narrowed set returned as-is never re-expanded; a stored token no longer offerable filtered out; out-of-order stored set normalized to offerable order.
+
+## etude-params-repository.spec.ts (Issue 14 additions)
+
+7 new tests covering `updateEtudeNotes` from `src/lib/etude-params-repository.ts`:
+- Persists pitches and durations (durations in canonical order), increments the workflow version, sets `notesConfirmed: true`, keeps `setupConfirmed` true, and leaves split state unchanged.
+- When pitches match the stored pitches but durations change, the durations update and the version increments.
+- Rejects a stale workflow version (version-mismatch) and persists nothing, `notesConfirmed` unchanged.
+- Rejects a stale epoch (epoch-mismatch) and persists nothing.
+- Wraps an injected update failure as a `db-error` and persists nothing.
+- An identical resubmit is a no-op (no version increment, `notesConfirmed` unchanged).
+- A stale-version resubmit of identical values is still a `version-mismatch`.

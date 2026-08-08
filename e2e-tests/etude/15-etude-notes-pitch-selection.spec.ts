@@ -16,6 +16,14 @@ const ETUDE_NOTES_PATH = '/etude/notes'
 const C_MAJOR_OCTAVE_4_PITCHES = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5']
 
 /**
+ * A valid duration set for the 4/4 meter (the default meter these pitch-only
+ * tests confirm). Kept small so the raw-request multipart helper stays under
+ * the test harness's field limit while still being an eligible 4/4 set. Issue
+ * 14 made the notes step coherent: the ordinary save requires both halves.
+ */
+const FOUR_FOUR_DURATIONS = ['Q', 'E']
+
+/**
  * Parse a Set-Cookie header value into the cookie name, value, and attribute
  * map so the tests can assert on individual attributes. Mirrors the helper in
  * 11-etude-setup-error-summary.spec.ts.
@@ -307,6 +315,7 @@ test.describe('Issue 13: notes step pitch selection', () => {
         action: 'save',
         workflowVersion: version,
         pitches: narrowedPitches,
+        durations: FOUR_FOUR_DURATIONS,
       })
       expect(response.status()).toBe(303)
 
@@ -343,6 +352,7 @@ test.describe('Issue 13: notes step pitch selection', () => {
         action: 'save',
         workflowVersion: version,
         pitches: ['C4', 'D4', 'E4'],
+        durations: FOUR_FOUR_DURATIONS,
       })
       expect(firstSave.status()).toBe(303)
 
@@ -356,6 +366,7 @@ test.describe('Issue 13: notes step pitch selection', () => {
         action: 'save',
         workflowVersion: staleVersion,
         pitches: ['C4', 'D4'],
+        durations: FOUR_FOUR_DURATIONS,
       })
       expect(response.status()).toBe(303)
 
@@ -390,6 +401,7 @@ test.describe('Issue 13: notes step pitch selection', () => {
         action: 'save',
         workflowVersion: version,
         pitches: ['C4', 'D4'],
+        durations: FOUR_FOUR_DURATIONS,
       })
       expect(firstSave.status()).toBe(303)
 
@@ -400,6 +412,7 @@ test.describe('Issue 13: notes step pitch selection', () => {
         action: 'save',
         workflowVersion: currentVersion,
         pitches: ['C4'],
+        durations: FOUR_FOUR_DURATIONS,
       })
 
       // Navigate to the notes step to see the redisplay.

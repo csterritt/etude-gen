@@ -34,7 +34,7 @@ import { PATHS, STANDARD_SECURE_HEADERS, ALLOW_SCRIPTS_SECURE_HEADERS } from '..
 import { type AppEnv, type AuthUser, type DrizzleClient } from '../local-types'
 import { useLayout } from './build-layout'
 import { signedInAccess } from '../middleware/signed-in-access'
-import { loadEtudeParams, updateEtudePitches } from '../lib/etude-params-repository'
+import { loadEtudeParams, updateEtudePitches, updateEtudeNotes } from '../lib/etude-params-repository'
 import { resolveCanonicalRoute } from '../lib/canonical-route'
 import { handleUnexpectedError } from './build-safe-error'
 import { logError, sanitizeError } from '../lib/logger'
@@ -49,12 +49,20 @@ import {
   validatePitchSelection,
   resolvePitchSelectionState,
 } from '../lib/pitch-selection-validator'
+import {
+  computeOfferableDurations,
+  validateDurationSelection,
+  resolveDurationSelectionState,
+  DURATION_LABELS,
+  loadRhythmCatalog,
+} from '../lib/duration-selection-validator'
+import { RHYTHM_CATALOG_TEXT } from '../lib/rhythm-catalog-data'
 
 /**
  * Field order for the notes form, used by `buildErrorSummaryEntries` to order
  * summary entries by the fields' visual appearance.
  */
-const NOTES_FIELD_ORDER = ['pitches'] as const
+const NOTES_FIELD_ORDER = ['pitches', 'durations'] as const
 
 /**
  * Optional redisplay data passed from the GET handler when a validation-state
@@ -110,24 +118,39 @@ const renderFieldErrors = (entries: ErrorSummaryEntry[], field: string) => {
 }
 
 /**
- * Render the JSX for the notes-step pitch-selection form. Available pitches
- * are derived from the stored key and octave range. The pre-selected pitches
- * come from `resolvePitchSelectionState` (first-derivation all-selected
- * default, or the stored narrowed selection). When `redisplay` is present, the
- * submitted pitches override the pre-selection for redisplay.
+ * Render the JSX for the notes-step form. Available pitches are derived from
+ * the stored key and octave range; offerable durations are derived from the
+ * stored meter's catalog patterns. The pre-selected values come from
+ * `resolvePitchSelectionState`/`resolveDurationSelectionState` (first-derivation
+ * all-selected default, or the stored narrowed selection, never re-expanded).
+ * When `redisplay` is present, the submitted values override the pre-selection
+ * for redisplay alongside the errors.
  */
-const renderEtudeNotesForm = (params: EtudeParamsLike, redisplay?: RedisplayData) => {
+const renderEtudeNotesForm = (
+  params: EtudeParamsLike,
+  offerableDurations: string[],
+  redisplay?: RedisplayData,
+) => {
   const safeValues = redisplay?.safeValues ?? {}
   const fieldErrors = redisplay?.fieldErrors ?? []
   const octaves = parseStoredOctaves(params.selectedOctaves)
   const available = deriveAvailablePitches(params.keySignature, octaves)
   const availablePitches = available.pitches
   const firstPitchId = `pitch-field-${availablePitches[0] ?? 'none'}`
-  const groupFields: Record<string, { firstMemberId: string }> =
-    availablePitches.length > 0 ? { pitches: { firstMemberId: firstPitchId } } : {}
+  const firstDurationId =
+    offerableDurations.length > 0
+      ? `duration-field-${offerableDurations[0]!}`
+      : 'duration-field-none'
+  const groupFields: Record<string, { firstMemberId: string }> = {}
+  if (availablePitches.length > 0) {
+    groupFields.pitches = { firstMemberId: firstPitchId }
+  }
+  if (offerableDurations.length > 0) {
+    groupFields.durations = { firstMemberId: firstDurationId }
+  }
 
   // Build the error-summary entries with the group-field config so group-level
-  // errors link to the first pitch checkbox.
+  // errors link to the first member of each group.
   const entries = buildErrorSummaryEntries(
     fieldErrors,
     [...NOTES_FIELD_ORDER],
@@ -145,13 +168,27 @@ const renderEtudeNotesForm = (params: EtudeParamsLike, redisplay?: RedisplayData
   const selectedPitches = redisplayPitches ?? resolved.selectedPitches
   const selectedSet = new Set(selectedPitches)
 
+  // Resolve the pre-selected durations: first-derivation all-offerable, or the
+  // stored narrowed selection.
+  const resolvedDurations = resolveDurationSelectionState(
+    params.selectedDurations,
+    offerableDurations,
+  )
+  // When redisplay data is present, the submitted durations override the
+  // pre-selection.
+  const redisplayDurations = Array.isArray(safeValues.durations)
+    ? safeValues.durations
+    : null
+  const selectedDurations = redisplayDurations ?? resolvedDurations.selectedDurations
+  const durationSet = new Set(selectedDurations)
+
   return (
     <div data-testid='etude-notes-banner' className='flex justify-center'>
       <div className='card w-full max-w-md bg-base-100 shadow-xl'>
         <div className='card-body'>
-          <h2 className='card-title text-2xl font-bold mb-4'>Select pitches</h2>
+          <h2 className='card-title text-2xl font-bold mb-4'>Select notes</h2>
           <p className='text-gray-600 mb-6'>
-            Choose which pitches from the available range to include in your etude.
+            Choose the pitches and durations to include in your etude.
           </p>
           {entries.length > 0 && <ErrorSummary entries={entries} />}
           {entries.length > 0 && raw(buildErrorSummaryFocusScript('error-summary'))}
@@ -163,7 +200,7 @@ const renderEtudeNotesForm = (params: EtudeParamsLike, redisplay?: RedisplayData
               data-testid='workflow-version-field'
             />
             <fieldset
-              className='form-control mb-6'
+              className='flex flex-col mb-6'
               aria-describedby={describedByFor(entries, 'pitches', 'pitches-instructions')}
             >
               <legend className='label-text mb-2'>Pitches</legend>
@@ -194,6 +231,38 @@ const renderEtudeNotesForm = (params: EtudeParamsLike, redisplay?: RedisplayData
               </p>
               {renderFieldErrors(entries, 'pitches')}
             </fieldset>
+            <fieldset
+              className='flex flex-col mb-6'
+              aria-describedby={describedByFor(entries, 'durations', 'durations-instructions')}
+            >
+              <legend className='label-text mb-2'>Durations</legend>
+              <p id='durations-instructions' className='text-xs text-gray-500 mt-1'>
+                Select one or more durations that fit the {params.timeSignature} meter.
+              </p>
+              <div className='flex flex-col gap-1 mt-2'>
+                {offerableDurations.map((token) => {
+                  const checked = durationSet.has(token)
+                  return (
+                    <label key={token} className='label cursor-pointer justify-start gap-2'>
+                      <input
+                        type='checkbox'
+                        name='durations'
+                        value={token}
+                        checked={checked}
+                        data-testid={`duration-field-${token}`}
+                        id={`duration-field-${token}`}
+                        className='checkbox checkbox-sm'
+                      />
+                      <span className='label-text'>{DURATION_LABELS[token] ?? token}</span>
+                    </label>
+                  )
+                })}
+              </div>
+              <p data-testid='duration-group-intro' className='text-xs text-gray-500 mt-2'>
+                Offerable durations for the {params.timeSignature} meter.
+              </p>
+              {renderFieldErrors(entries, 'durations')}
+            </fieldset>
             <div className='card-actions justify-end gap-2'>
               <button
                 type='submit'
@@ -211,7 +280,7 @@ const renderEtudeNotesForm = (params: EtudeParamsLike, redisplay?: RedisplayData
                 className='btn btn-primary'
                 data-testid='notes-save-action'
               >
-                Save pitches
+                Save notes
               </button>
             </div>
           </form>
@@ -230,6 +299,8 @@ interface EtudeParamsLike {
   keySignature: string
   selectedOctaves: string
   selectedPitches: string | null
+  selectedDurations: string | null
+  timeSignature: string
   workflowVersion: number
 }
 
@@ -290,7 +361,16 @@ export const buildEtudeNotes = (app: Hono<{ Bindings: any }>): void => {
         redisplay = undefined
       }
 
-      return c.render(useLayout(c, renderEtudeNotesForm(result.value, redisplay)))
+      // Parse the rhythm catalog once per request and derive the offerable
+      // duration set for the stored meter. A parse failure (impossible for the
+      // packaged catalog) yields an empty offerable set and a rejection path,
+      // never a 500.
+      const catalog = loadRhythmCatalog(RHYTHM_CATALOG_TEXT)
+      const offerableDurations = computeOfferableDurations(catalog, result.value.timeSignature)
+
+      return c.render(
+        useLayout(c, renderEtudeNotesForm(result.value, offerableDurations, redisplay)),
+      )
     },
   )
 
@@ -353,6 +433,7 @@ export const buildEtudeNotes = (app: Hono<{ Bindings: any }>): void => {
       const params = loadResult.value
       const octaves = parseStoredOctaves(params.selectedOctaves)
       const availablePitches = deriveAvailablePitches(params.keySignature, octaves).pitches
+      const catalog = loadRhythmCatalog(RHYTHM_CATALOG_TEXT)
 
       // Read the action field: 'save' (ordinary) or 'select-all'.
       const rawAction = form.get('action')
@@ -390,29 +471,47 @@ export const buildEtudeNotes = (app: Hono<{ Bindings: any }>): void => {
         return redirectWithMessage(c, PATHS.ETUDE_NOTES, 'All pitches selected.')
       }
 
-      // Ordinary save: read the submitted pitches (an empty array when no
-      // checkboxes are checked) and validate against the available set and
-      // the cardinality rules.
+      // Ordinary save: read the submitted pitches and durations and validate
+      // both halves against the available pitch set / offerable duration set
+      // and their rules. When either half fails, shape a single redisplay
+      // payload carrying both safe values and all field errors (pitch and
+      // duration), and redirect with validation state. Nothing is persisted.
       const submittedPitches = form.getAll('pitches').map((v) => (typeof v === 'string' ? v : String(v ?? '')))
-      const validation = validatePitchSelection(submittedPitches, availablePitches, params.hand)
-      if (validation.isErr) {
-        const fieldErrors: FieldError[] = validation.error.map((f) => ({
-          field: f.field,
-          message: f.reason,
-        }))
+      const submittedDurations = form.getAll('durations').map((v) => (typeof v === 'string' ? v : String(v ?? '')))
+      const pitchValidation = validatePitchSelection(submittedPitches, availablePitches, params.hand)
+      const durationValidation = validateDurationSelection(
+        submittedDurations,
+        catalog,
+        params.timeSignature,
+      )
+      if (pitchValidation.isErr || durationValidation.isErr) {
+        const fieldErrors: FieldError[] = []
+        if (!pitchValidation.isOk) {
+          for (const f of pitchValidation.error) {
+            fieldErrors.push({ field: f.field, message: f.reason })
+          }
+        }
+        if (!durationValidation.isOk) {
+          for (const f of durationValidation.error) {
+            fieldErrors.push({ field: f.field, message: f.reason })
+          }
+        }
         const shaped = shapeRedisplayPayload(
-          { pitches: submittedPitches },
+          { pitches: submittedPitches, durations: submittedDurations },
           fieldErrors,
         )
         return redirectWithValidationState(c, PATHS.ETUDE_NOTES, db, user.id, shaped)
       }
 
-      const updateResult = await updateEtudePitches(
+      // Combined compare-and-set save of both halves, which confirms the
+      // coherent notes step (notesConfirmed becomes true).
+      const updateResult = await updateEtudeNotes(
         db,
         user.id,
         params.aggregateEpoch,
         versionParseResult.value,
-        validation.value,
+        pitchValidation.value,
+        durationValidation.value,
       )
       if (updateResult.isErr) {
         if (!updateResult.isOk) {
@@ -429,11 +528,11 @@ export const buildEtudeNotes = (app: Hono<{ Bindings: any }>): void => {
         return redirectWithError(
           c,
           PATHS.ETUDE_NOTES,
-          'Your pitch selection could not be saved because the form was stale. Please review the current values and try again.',
+          'Your notes selection could not be saved because the form was stale. Please review the current values and try again.',
         )
       }
 
-      return redirectWithMessage(c, PATHS.ETUDE_NOTES, 'Pitch selection saved.')
+      return redirectWithMessage(c, PATHS.ETUDE_NOTES, 'Notes selection saved.')
     },
   )
 }

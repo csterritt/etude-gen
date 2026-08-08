@@ -304,3 +304,22 @@ Modified test files:
 - `e2e-tests/etude/13-etude-operation-precondition-stale.spec.ts` — updated the expected canonical route from `/etude/setup` to `/etude/notes` after setup is confirmed (the notes step now exists).
 
 Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`, `project-overview.md`.
+
+## [2026-08-08] ingest | issue-014 notes step duration selection
+
+Ingested the notes-step duration selection: the duration-selection validator and resolver, the combined `updateEtudeNotes` repository function, the extended notes route handlers with both groups, and the new test files (issue #14).
+
+New source files:
+- `src/lib/duration-selection-validator.ts` — `computeOfferableDurations` (offerable set per meter from the catalog), `validateDurationSelection` (de-duplication, canonical ordering, unknown/not-offerable rejection, empty rejection, eligibility with the stable corrective message naming the computed suggestion by display label), `computeCorrectiveSuggestion` (smallest addition set that restores eligibility, deterministic search), `resolveDurationSelectionState` (all-offerable first-derivation default, non-re-expansion, re-derivation after Issue 11 clear), and the shared `loadRhythmCatalog` parse helper; pure functions with `DURATION_LABELS`, `CANONICAL_DURATION_ORDER`, and `EMPTY_DURATION_MESSAGE`.
+- `e2e-tests/etude/16-etude-notes-duration-selection.spec.ts` — 10 Playwright tests covering offered controls per meter, the all-offerable default, direct POST of an impossible set producing a group-level corrective error with no persistence and the selection redisplayed, the focused error summary linked into the duration group, de-duplication, unknown/not-offerable rejection, empty rejection, stale-version rejection, and step completeness only after both pitches and durations are confirmed.
+
+Modified source files:
+- `src/lib/etude-params-repository.ts` — added `updateEtudeNotes` (combined CAS persistence of `selectedPitches` + `selectedDurations`, `notesConfirmed: true`, version increment, identical-resubmit short-circuit, stale-version/epoch-mismatch rejection, db-error handling; does not modify split state). `updateEtudePitches` retained unchanged (pitch-only Select all path).
+- `src/routes/build-etude-notes.tsx` — extended `GET /etude/notes` to render a second duration fieldset (offerable durations for the stored meter, display labels, first-derivation or stored selection, error-summary wiring for both groups); extended `POST /etude/notes` ordinary save to validate and persist both halves via `updateEtudeNotes`; Select all remains pitch-only.
+
+Modified test files:
+- `tests/duration-selection-validator.spec.ts` — new 25-test file (see unit-tests.md).
+- `tests/etude-params-repository.spec.ts` — 7 new tests for `updateEtudeNotes`.
+- `e2e-tests/etude/15-etude-notes-pitch-selection.spec.ts` — updated the ordinary-save pitch tests to also submit a valid duration set, since Issue 14 made the notes step coherent (the ordinary save requires both halves).
+
+Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`, `project-overview.md`.

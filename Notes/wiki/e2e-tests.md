@@ -178,3 +178,18 @@ A catalog and summaries of all end-to-end tests under `e2e-tests/`.
 - A stale workflow version is rejected and the currently saved selection is shown (not the submitted stale one).
 - A rejected two-hand submission redisplays the one submitted pitch checked alongside the cardinality error, the error summary is focused, and the prior valid selection is still stored.
 - The error summary links into the pitch group: each summary entry's href resolves to an existing control and following it moves focus there.
+
+## etude/16-etude-notes-duration-selection.spec.ts
+
+10 Playwright tests covering the Issue 14 notes-step duration selection end-to-end:
+
+- For a saved 2/4 meter, exactly the offerable duration controls appear (`duration-field-<token>` for H, Q, R, E) and whole and dotted-half controls are absent.
+- For a saved 4/4 meter, all six supported durations are offered.
+- A freshly derived notes step has every offerable duration selected by default (and all available pitches selected by default).
+- A direct POST of an impossible duration set ({R} in 2/4) is rejected with a group-level corrective error naming the duration group, the current meter, and the "half" duration suggestion; the submitted selection is redisplayed (R checked, the rest unchecked); the error summary is present and focused and links into the duration group (`#duration-field-*`); nothing is persisted and the notes step stays unconfirmed.
+- Duplicate submissions of the same offerable duration are de-duplicated and persisted in canonical order ('Q,E').
+- An unknown duration token is rejected field-addressably with no persistence.
+- A supported duration token not offerable for the meter (whole in 2/4) is rejected field-addressably naming the token and meter, with no persistence.
+- An empty duration selection is rejected with "Select at least one duration." and nothing is persisted.
+- A stale workflow version is rejected and the currently saved durations are shown (not the submitted stale ones).
+- The notes step is complete only after both pitches and durations are confirmed: Select all alone keeps the step incomplete (still routed to /etude/notes); a combined save then confirms the step and the canonical route no longer returns /etude/notes.

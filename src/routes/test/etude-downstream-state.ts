@@ -70,6 +70,16 @@ export const handleEtudeDownstreamState = (app: Hono<{ Bindings: any }>): void =
           : null
       const splitBoundary =
         typeof parsed['splitBoundary'] === 'string' ? (parsed['splitBoundary'] as string) : null
+      // Optional confirmation-flag overrides (Issue 16 corrupt-state tests):
+      // when absent, the flags default to true (the original behavior).
+      const notesConfirmed =
+        typeof parsed['notesConfirmed'] === 'string'
+          ? parsed['notesConfirmed'] === 'true'
+          : true
+      const splitConfirmed =
+        typeof parsed['splitConfirmed'] === 'string'
+          ? parsed['splitConfirmed'] === 'true'
+          : true
 
       // Set the downstream confirmation flags and data fields directly. This
       // is test infrastructure that simulates the notes and split steps — it
@@ -78,8 +88,8 @@ export const handleEtudeDownstreamState = (app: Hono<{ Bindings: any }>): void =
         await db
           .update(etudeParams)
           .set({
-            notesConfirmed: true,
-            splitConfirmed: true,
+            notesConfirmed,
+            splitConfirmed,
             selectedPitches,
             selectedDurations,
             splitBoundary,

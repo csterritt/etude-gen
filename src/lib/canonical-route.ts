@@ -11,20 +11,44 @@
  * by having valid default values. Defaults pre-populate controls; they do not
  * pre-confirm steps.
  *
- * This issue (4) handles the first two rows of the state table: no aggregate
- * and setup-not-confirmed both resolve to `/etude/setup`. Later issues extend
- * this resolver with the notes/split/review/score rows.
+ * Rows handled: no aggregate → `/etude/setup`; setup unconfirmed →
+ * `/etude/setup`; notes unconfirmed → `/etude/notes`; both hands, notes
+ * confirmed, fewer than two stored pitches (corrupt state) → `/etude/notes`;
+ * both hands, notes confirmed, split unconfirmed → `/etude/split`; one hand,
+ * notes confirmed → `/etude/review` (split skipped); both hands, notes and
+ * split confirmed → `/etude/review`. Later issues extend this resolver with
+ * the score rows.
  * @module lib/canonical-route
  */
 import { PATHS } from '../constants'
 import type { EtudeParams } from './etude-params-repository'
 
 /**
+ * Count the selected pitches stored in a comma-separated string. Null or empty
+ * means zero pitches. Used by the corrupt-state recovery check: a two-hand
+ * aggregate holding fewer than two stored pitches is returned to the notes
+ * step (cross-cutting contract section 5 "stored values no longer validate").
+ */
+const countSelectedPitches = (selectedPitches: string | null): number => {
+  if (selectedPitches === null || selectedPitches === '') {
+    return 0
+  }
+  return selectedPitches.split(',').filter((p) => p.length > 0).length
+}
+
+/**
  * Resolve the canonical route for the current aggregate state.
  *
  * Returns `/etude/setup` when no aggregate exists (the aggregate is created
- * with defaults first) and when setup is not yet confirmed. Later issues
- * extend this with the remaining rows of the section-5 state table.
+ * with defaults first) and when setup is not yet confirmed. Returns
+ * `/etude/notes` when the notes step is unconfirmed, and also when both hands
+ * are selected but fewer than two pitches are stored (corrupt state — the
+ * notes step is the earliest incomplete step because the two-hand minimum is
+ * no longer met). Returns `/etude/split` when both hands are selected, the
+ * notes step is confirmed, and the split step is unconfirmed. Returns
+ * `/etude/review` when one hand is selected and notes are confirmed (split
+ * skipped), or when both hands are selected and the split step is confirmed.
+ * Later issues extend this with the score rows.
  * @param params - The owner's aggregate snapshot, or null when none exists
  * @returns The canonical route path
  */
@@ -45,6 +69,23 @@ export const resolveCanonicalRoute = (params: EtudeParams | null): string => {
     return PATHS.ETUDE_NOTES
   }
 
-  // Later issues extend this resolver for the split/review/score rows.
-  return PATHS.ETUDE_SETUP
+  // Notes are confirmed. When both hands are selected but fewer than two
+  // pitches are stored (corrupt state from an out-of-band change or an
+  // interrupted invalidation), the notes step is the earliest incomplete
+  // step because the two-hand minimum is no longer met. The split step never
+  // renders an empty or single-option boundary list.
+  if (params.hand === 'both' && countSelectedPitches(params.selectedPitches) < 2) {
+    return PATHS.ETUDE_NOTES
+  }
+
+  // Both hands, notes confirmed, enough pitches: the split step is the
+  // earliest incomplete step when it is unconfirmed.
+  if (params.hand === 'both' && !params.splitConfirmed) {
+    return PATHS.ETUDE_SPLIT
+  }
+
+  // One hand with notes confirmed (split skipped), or both hands with split
+  // confirmed: the review step is the canonical route. Later issues extend
+  // this with the score rows.
+  return PATHS.ETUDE_REVIEW
 }

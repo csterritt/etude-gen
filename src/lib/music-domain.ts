@@ -260,3 +260,60 @@ export const deriveAvailablePitches = (
   const highest = capped[capped.length - 1] ?? ''
   return { pitches: capped, lowest, highest }
 }
+
+/**
+ * An eligible split boundary for a two-hand workflow (Issue 16).
+ *
+ * A boundary is a split between two adjacent selected pitches: the lower
+ * pitches are assigned to the left hand and the higher pitches to the right,
+ * and both sets are non-empty. The `id` is a deterministic string built from
+ * the two adjacent pitch names so the form (radio values) and the validator
+ * share a single stable identifier. `lowerPitch` and `upperPitch` are the two
+ * adjacent selected pitches that form the split.
+ */
+export interface EligibleBoundary {
+  id: string
+  left: string[]
+  right: string[]
+  lowerPitch: string
+  upperPitch: string
+}
+
+/**
+ * Derive the eligible split boundaries for a two-hand workflow from the
+ * currently selected pitches (Issue 16).
+ *
+ * The Music Domain owns boundary eligibility, derived from the currently
+ * selected pitches. A boundary is offered between each adjacent pair of
+ * selected pitches (in the given order): the lower pitches are assigned to
+ * the left hand and the higher pitches to the right, and both sets are
+ * non-empty by construction. The caller is responsible for passing the
+ * selected pitches in available-set order (the notes step stores them that
+ * way via `validatePitchSelection`).
+ *
+ * When fewer than two pitches are selected, no boundary can leave both hands
+ * non-empty, so an empty list is returned. The function is pure: it never
+ * mutates its argument or throws.
+ * @param selectedPitches - The currently selected pitches, in available-set order
+ * @returns The eligible boundary list, ordered by the position of the split
+ */
+export const deriveEligibleBoundaries = (
+  selectedPitches: readonly string[],
+): EligibleBoundary[] => {
+  if (selectedPitches.length < 2) {
+    return []
+  }
+  const boundaries: EligibleBoundary[] = []
+  for (let i = 0; i < selectedPitches.length - 1; i += 1) {
+    const lowerPitch = selectedPitches[i]!
+    const upperPitch = selectedPitches[i + 1]!
+    boundaries.push({
+      id: `${lowerPitch}|${upperPitch}`,
+      left: selectedPitches.slice(0, i + 1),
+      right: selectedPitches.slice(i + 1),
+      lowerPitch,
+      upperPitch,
+    })
+  }
+  return boundaries
+}

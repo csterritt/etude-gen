@@ -20,6 +20,8 @@ import {
   updateEtudeSetup,
   updateEtudePitches,
   updateEtudeNotes,
+  updateEtudeSplit,
+  clearEtudeSplit,
   type EtudeParams,
 } from '../src/lib/etude-params-repository'
 import type { ValidSetup } from '../src/lib/setup-validator'
@@ -1453,5 +1455,275 @@ describe('updateEtudeNotes', () => {
     }
     const reloaded = unwrap(await loadEtudeParams(db, 'user-206'))
     expect(reloaded?.workflowVersion).toBe(firstSave.workflowVersion)
+  })
+})
+
+/**
+ * Confirm the setup and notes steps so the split step (which requires
+ * setupConfirmed and notesConfirmed) is reachable. Returns the post-update
+ * aggregate with notesConfirmed set and the supplied pitches/durations stored.
+ */
+const confirmNotes = async (
+  db: DrizzleClient,
+  userId: string,
+  pitches: string[] = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'],
+  durations: string[] = ['Q', 'E'],
+): Promise<EtudeParams> => {
+  const confirmed = await confirmSetup(db, userId)
+  return unwrap(
+    await updateEtudeNotes(
+      db,
+      userId,
+      confirmed.aggregateEpoch,
+      confirmed.workflowVersion,
+      pitches,
+      durations,
+    ),
+  )
+}
+
+describe('updateEtudeSplit', () => {
+  it('persists splitBoundary, sets splitConfirmed, and increments the version', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-300', 'threehundred@example.com')
+    const confirmed = await confirmNotes(db, 'user-300')
+    const versionBefore = confirmed.workflowVersion
+
+    const result = await updateEtudeSplit(
+      db,
+      'user-300',
+      confirmed.aggregateEpoch,
+      confirmed.workflowVersion,
+      'E4|G4',
+    )
+
+    const after = unwrap(result)
+    expect(after.splitBoundary).toBe('E4|G4')
+    expect(after.splitConfirmed).toBe(true)
+    expect(after.workflowVersion).toBe(versionBefore + 1)
+    // Upstream state is untouched.
+    expect(after.setupConfirmed).toBe(true)
+    expect(after.notesConfirmed).toBe(true)
+    expect(after.selectedPitches).toBe(confirmed.selectedPitches)
+    expect(after.selectedDurations).toBe(confirmed.selectedDurations)
+  })
+
+  it('rejects a stale workflow version, persists nothing, and leaves splitConfirmed unchanged', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-301', 'threehundredone@example.com')
+    const confirmed = await confirmNotes(db, 'user-301')
+
+    const staleVersion = confirmed.workflowVersion - 1
+    const result = await updateEtudeSplit(
+      db,
+      'user-301',
+      confirmed.aggregateEpoch,
+      staleVersion,
+      'E4|G4',
+    )
+
+    expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('version-mismatch')
+    }
+    const reloaded = unwrap(await loadEtudeParams(db, 'user-301'))
+    expect(reloaded?.splitBoundary).toBeNull()
+    expect(reloaded?.splitConfirmed).toBe(false)
+    expect(reloaded?.workflowVersion).toBe(confirmed.workflowVersion)
+  })
+
+  it('rejects a stale epoch, persists nothing, and leaves everything unchanged', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-302', 'threehundredtwo@example.com')
+    const confirmed = await confirmNotes(db, 'user-302')
+
+    const staleEpoch = confirmed.aggregateEpoch - 1
+    const result = await updateEtudeSplit(
+      db,
+      'user-302',
+      staleEpoch,
+      confirmed.workflowVersion,
+      'E4|G4',
+    )
+
+    expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('epoch-mismatch')
+    }
+    const reloaded = unwrap(await loadEtudeParams(db, 'user-302'))
+    expect(reloaded?.splitBoundary).toBeNull()
+    expect(reloaded?.splitConfirmed).toBe(false)
+    expect(reloaded?.workflowVersion).toBe(confirmed.workflowVersion)
+  })
+
+  it('wraps an injected update failure as a db-error and persists nothing', async () => {
+    const realDb = createTestDb()
+    await insertUser(realDb, 'user-303', 'threehundredthree@example.com')
+    const confirmed = await confirmNotes(realDb, 'user-303')
+
+    const throwingDb = {
+      ...realDb,
+      update: () => {
+        throw new Error('injected update failure')
+      },
+    } as unknown as DrizzleClient
+
+    const result = await updateEtudeSplit(
+      throwingDb,
+      'user-303',
+      confirmed.aggregateEpoch,
+      confirmed.workflowVersion,
+      'E4|G4',
+    )
+
+    expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('db-error')
+    }
+    const reloaded = unwrap(await loadEtudeParams(realDb, 'user-303'))
+    expect(reloaded?.splitBoundary).toBeNull()
+    expect(reloaded?.splitConfirmed).toBe(false)
+    expect(reloaded?.workflowVersion).toBe(confirmed.workflowVersion)
+  })
+
+  it('an identical resubmit is a no-op (no version increment, splitConfirmed unchanged)', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-304', 'threehundredfour@example.com')
+    const confirmed = await confirmNotes(db, 'user-304')
+    const firstSave = unwrap(
+      await updateEtudeSplit(
+        db,
+        'user-304',
+        confirmed.aggregateEpoch,
+        confirmed.workflowVersion,
+        'E4|G4',
+      ),
+    )
+    const versionAfterFirst = firstSave.workflowVersion
+
+    const result = await updateEtudeSplit(
+      db,
+      'user-304',
+      firstSave.aggregateEpoch,
+      firstSave.workflowVersion,
+      'E4|G4',
+    )
+
+    const after = unwrap(result)
+    expect(after.splitBoundary).toBe('E4|G4')
+    expect(after.splitConfirmed).toBe(true)
+    expect(after.workflowVersion).toBe(versionAfterFirst)
+  })
+
+  it('rejects a stale-version resubmit of an identical boundary as a version-mismatch', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-305', 'threehundredfive@example.com')
+    const confirmed = await confirmNotes(db, 'user-305')
+    const firstSave = unwrap(
+      await updateEtudeSplit(
+        db,
+        'user-305',
+        confirmed.aggregateEpoch,
+        confirmed.workflowVersion,
+        'E4|G4',
+      ),
+    )
+
+    const result = await updateEtudeSplit(
+      db,
+      'user-305',
+      firstSave.aggregateEpoch,
+      confirmed.workflowVersion,
+      'E4|G4',
+    )
+
+    expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('version-mismatch')
+    }
+    const reloaded = unwrap(await loadEtudeParams(db, 'user-305'))
+    expect(reloaded?.workflowVersion).toBe(firstSave.workflowVersion)
+  })
+})
+
+describe('clearEtudeSplit', () => {
+  it('nulls splitBoundary and sets splitConfirmed false without incrementing the version', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-310', 'threehundredten@example.com')
+    const confirmed = await confirmNotes(db, 'user-310')
+    const saved = unwrap(
+      await updateEtudeSplit(
+        db,
+        'user-310',
+        confirmed.aggregateEpoch,
+        confirmed.workflowVersion,
+        'E4|G4',
+      ),
+    )
+    const versionBefore = saved.workflowVersion
+    expect(saved.splitBoundary).toBe('E4|G4')
+    expect(saved.splitConfirmed).toBe(true)
+
+    const result = await clearEtudeSplit(db, 'user-310', saved.aggregateEpoch, false)
+
+    const after = unwrap(result)
+    expect(after.splitBoundary).toBeNull()
+    expect(after.splitConfirmed).toBe(false)
+    // The version is NOT incremented: this is a corrective clear, not a
+    // student submission.
+    expect(after.workflowVersion).toBe(versionBefore)
+    // notesConfirmed is retained when unconfirmNotes is false.
+    expect(after.notesConfirmed).toBe(true)
+  })
+
+  it('also unconfirms the notes step when unconfirmNotes is true (corrupt-state recovery)', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-311', 'threehundredeleven@example.com')
+    const confirmed = await confirmNotes(db, 'user-311')
+    const saved = unwrap(
+      await updateEtudeSplit(
+        db,
+        'user-311',
+        confirmed.aggregateEpoch,
+        confirmed.workflowVersion,
+        'E4|G4',
+      ),
+    )
+    const versionBefore = saved.workflowVersion
+
+    const result = await clearEtudeSplit(db, 'user-311', saved.aggregateEpoch, true)
+
+    const after = unwrap(result)
+    expect(after.splitBoundary).toBeNull()
+    expect(after.splitConfirmed).toBe(false)
+    expect(after.notesConfirmed).toBe(false)
+    expect(after.workflowVersion).toBe(versionBefore)
+  })
+
+  it('rejects a stale epoch, persists nothing, and leaves everything unchanged', async () => {
+    const db = createTestDb()
+    await insertUser(db, 'user-312', 'threehundredtwelve@example.com')
+    const confirmed = await confirmNotes(db, 'user-312')
+    const saved = unwrap(
+      await updateEtudeSplit(
+        db,
+        'user-312',
+        confirmed.aggregateEpoch,
+        confirmed.workflowVersion,
+        'E4|G4',
+      ),
+    )
+
+    const staleEpoch = saved.aggregateEpoch - 1
+    const result = await clearEtudeSplit(db, 'user-312', staleEpoch, false)
+
+    expect(result.isErr).toBe(true)
+    if (!result.isOk) {
+      expect(result.error.kind).toBe('epoch-mismatch')
+    }
+    const reloaded = unwrap(await loadEtudeParams(db, 'user-312'))
+    expect(reloaded?.splitBoundary).toBe('E4|G4')
+    expect(reloaded?.splitConfirmed).toBe(true)
+    expect(reloaded?.workflowVersion).toBe(saved.workflowVersion)
   })
 })

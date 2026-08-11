@@ -21,7 +21,9 @@ import {
   expandOctaveRange,
   deriveScaleRangePitches,
   deriveAvailablePitches,
+  deriveEligibleBoundaries,
   type OctaveValidationFailure,
+  type EligibleBoundary,
 } from '../src/lib/music-domain'
 
 const unwrap = <T, E>(result: Result<T, E>): T => {
@@ -290,5 +292,94 @@ describe('deriveAvailablePitches', () => {
     expect(shuffled.pitches).toEqual(canonical.pitches)
     expect(shuffled.lowest).toBe(canonical.lowest)
     expect(shuffled.highest).toBe(canonical.highest)
+  })
+})
+
+describe('deriveEligibleBoundaries', () => {
+  // The full C-major octave-4 set (C4 through C5), used by several cases.
+  const C_MAJOR_OCTAVE_4 = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5']
+
+  it('returns exactly one boundary for two selected pitches, lower left and higher right, both non-empty', () => {
+    const boundaries = deriveEligibleBoundaries(['C4', 'D4'])
+    expect(boundaries).toHaveLength(1)
+    const b = boundaries[0] as EligibleBoundary
+    expect(b.left).toEqual(['C4'])
+    expect(b.right).toEqual(['D4'])
+    expect(b.lowerPitch).toBe('C4')
+    expect(b.upperPitch).toBe('D4')
+  })
+
+  it('returns two boundaries for three selected pitches, each splitting into non-empty partitions', () => {
+    const boundaries = deriveEligibleBoundaries(['C4', 'E4', 'G4'])
+    expect(boundaries).toHaveLength(2)
+    const first = boundaries[0] as EligibleBoundary
+    expect(first.left).toEqual(['C4'])
+    expect(first.right).toEqual(['E4', 'G4'])
+    expect(first.lowerPitch).toBe('C4')
+    expect(first.upperPitch).toBe('E4')
+    const second = boundaries[1] as EligibleBoundary
+    expect(second.left).toEqual(['C4', 'E4'])
+    expect(second.right).toEqual(['G4'])
+    expect(second.lowerPitch).toBe('E4')
+    expect(second.upperPitch).toBe('G4')
+  })
+
+  it('returns seven boundaries for the full C-major octave-4 set, each non-empty on both sides', () => {
+    const boundaries = deriveEligibleBoundaries(C_MAJOR_OCTAVE_4)
+    expect(boundaries).toHaveLength(7)
+    for (const b of boundaries) {
+      expect(b.left.length).toBeGreaterThan(0)
+      expect(b.right.length).toBeGreaterThan(0)
+    }
+    // The first boundary splits C4 from the rest; the last splits everything
+    // but C5 from C5.
+    const first = boundaries[0] as EligibleBoundary
+    expect(first.left).toEqual(['C4'])
+    expect(first.right).toEqual(['D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5'])
+    const last = boundaries[6] as EligibleBoundary
+    expect(last.left).toEqual(['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4'])
+    expect(last.right).toEqual(['C5'])
+  })
+
+  it('returns an empty list for a single selected pitch (no boundary can leave both hands non-empty)', () => {
+    expect(deriveEligibleBoundaries(['C4'])).toEqual([])
+  })
+
+  it('returns an empty list for an empty selected-pitches array', () => {
+    expect(deriveEligibleBoundaries([])).toEqual([])
+  })
+
+  it('produces stable boundary ids derived from the adjacent pitch pair', () => {
+    const boundaries = deriveEligibleBoundaries(['C4', 'E4', 'G4'])
+    const first = boundaries[0] as EligibleBoundary
+    const second = boundaries[1] as EligibleBoundary
+    // The id is a deterministic string built from the two adjacent pitch
+    // names so the form and validator share a single stable identifier.
+    expect(typeof first.id).toBe('string')
+    expect(first.id).not.toBe('')
+    expect(first.id).not.toBe(second.id)
+    // The id encodes the adjacent pair: it contains both pitch names.
+    expect(first.id).toContain('C4')
+    expect(first.id).toContain('E4')
+    expect(second.id).toContain('E4')
+    expect(second.id).toContain('G4')
+  })
+
+  it('orders boundaries by the position of the split in the selected-pitch array', () => {
+    const boundaries = deriveEligibleBoundaries(C_MAJOR_OCTAVE_4)
+    // The i-th boundary splits after index i, so lowerPitch is the pitch at
+    // index i and upperPitch is the pitch at index i + 1.
+    for (let i = 0; i < boundaries.length; i += 1) {
+      const b = boundaries[i] as EligibleBoundary
+      expect(b.lowerPitch).toBe(C_MAJOR_OCTAVE_4[i])
+      expect(b.upperPitch).toBe(C_MAJOR_OCTAVE_4[i + 1])
+    }
+  })
+
+  it('is pure: does not mutate its argument', () => {
+    const input = ['C4', 'D4', 'E4']
+    const snapshot = [...input]
+    deriveEligibleBoundaries(input)
+    expect(input).toEqual(snapshot)
   })
 })

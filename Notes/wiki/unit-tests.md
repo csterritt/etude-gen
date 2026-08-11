@@ -407,3 +407,56 @@ The catalog contribution built from the real packaged catalog by `buildCatalogHe
 - Returns an empty array when the selection is empty.
 - Does not mark a token disabled if a pattern uses only that token and it remains.
 - Handles a token in the selection that appears in no pattern (not disabled, since removing it changes nothing).
+
+## music-domain.spec.ts — deriveEligibleBoundaries (Issue 16)
+
+8 tests covering the `deriveEligibleBoundaries` function added in Issue 16:
+- Returns an empty array for fewer than two selected pitches.
+- Returns exactly one boundary for two adjacent pitches (the single split between them).
+- Returns N-1 boundaries for N selected pitches, each between two adjacent pitches.
+- Each boundary assigns lower pitches to the left hand and higher pitches to the right, with both sets non-empty.
+- The boundary id is the deterministic `<lowerPitch>|<upperPitch>` string.
+- Boundaries are ordered by the pitch order in the input array.
+- Does not mutate the input array.
+- Handles non-adjacent pitches in the available-set order (e.g. C, E, G produces two boundaries: C|E and E|G).
+
+## split-boundary-validator.spec.ts (Issue 16)
+
+14 tests covering the pure `validateSplitBoundary` and `resolveSplitBoundaryState` functions from `src/lib/split-boundary-validator.ts`:
+- Rejects a non-string submission with `EMPTY_BOUNDARY_MESSAGE`.
+- Rejects an empty/whitespace string with `EMPTY_BOUNDARY_MESSAGE`.
+- Rejects a tampered boundary id not in the eligible list with `INELIGIBLE_BOUNDARY_MESSAGE`.
+- Rejects any submission when the eligible boundary list is empty (fewer than two pitches) with `NO_ELIGIBLE_BOUNDARIES_MESSAGE`.
+- Accepts a valid boundary id and returns the matched `EligibleBoundary` with left/right assignment.
+- Trims surrounding whitespace before matching.
+- `resolveSplitBoundaryState` returns no preselection (`isFirstDerivation: true`) when the stored boundary is null.
+- Returns no preselection when the stored boundary is an empty/whitespace string.
+- Preselects the stored boundary when it matches an eligible boundary.
+- Discards a stored boundary that no longer matches any eligible boundary (`isFirstDerivation: false`, `selectedBoundaryId: null`).
+- Both functions are pure: no throws, no mutation.
+
+## etude-params-repository.spec.ts — updateEtudeSplit and clearEtudeSplit (Issue 16)
+
+9 tests covering the `updateEtudeSplit` and `clearEtudeSplit` repository functions added in Issue 16:
+- `updateEtudeSplit` persists splitBoundary, sets splitConfirmed, and increments the version.
+- Rejects a stale workflow version (version-mismatch) and persists nothing.
+- Rejects a stale epoch (epoch-mismatch) and persists nothing.
+- Wraps an injected update failure as a db-error and persists nothing.
+- An identical resubmit is a no-op (no version increment, splitConfirmed unchanged).
+- A stale-version resubmit of an identical boundary is still a version-mismatch.
+- `clearEtudeSplit` nulls splitBoundary and sets splitConfirmed false without incrementing the version.
+- Also unconfirms the notes step when `unconfirmNotes` is true (corrupt-state recovery).
+- Rejects a stale epoch (epoch-mismatch) and persists nothing.
+
+## canonical-route.spec.ts — split and review rows (Issue 16)
+
+9 tests covering the Issue 16 extension to `resolveCanonicalRoute` and the `PATHS` constants:
+- `PATHS.ETUDE_SPLIT` is `/etude/split`.
+- `PATHS.ETUDE_REVIEW` is `/etude/review`.
+- Routes to /etude/split when both hands, notes confirmed, split unconfirmed.
+- Routes to /etude/review when both hands, notes confirmed, split confirmed.
+- Routes to /etude/review when one hand (left), notes confirmed (split skipped).
+- Routes to /etude/review when one hand (right), notes confirmed (split skipped).
+- Routes to /etude/notes when both hands, notes confirmed, fewer than two stored pitches (corrupt state).
+- Routes to /etude/notes when both hands, notes confirmed, no stored pitches (corrupt state).
+- Still routes to /etude/notes when both hands and notes are unconfirmed.

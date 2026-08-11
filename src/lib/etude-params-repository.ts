@@ -596,3 +596,193 @@ const updateEtudePitchesActual = async (
     return Result.err({ kind: 'db-error', error: e instanceof Error ? e : new Error(String(e)) })
   }
 }
+/**
+ * Conditionally update the split boundary of the owner's aggregate (Issue 16).
+ *
+ * Verifies both the aggregate epoch and the workflow version at commit, exactly
+ * like `updateEtudeNotes`: the `where` clause matches `userId`,
+ * `aggregateEpoch === expectedEpoch`, and `workflowVersion ===
+ * expectedWorkflowVersion`, so a request whose captured epoch or version no
+ * longer matches the stored values updates zero rows and returns a typed
+ * conflict. On success the same committed transition increments
+ * `workflowVersion` by 1, sets `splitBoundary` to the submitted boundary id,
+ * and sets `splitConfirmed` to true. Never read-then-unconditionally-write.
+ *
+ * Does NOT modify `selectedPitches`, `selectedDurations`, `setupConfirmed`,
+ * or `notesConfirmed`.
+ *
+ * An identical resubmit (same `splitBoundary` as stored, same version) is a
+ * no-op: no version increment, no write, no flag changes. A stale version on
+ * an identical resubmit is still a version-mismatch.
+ *
+ * CAS conflicts (`version-mismatch`, `epoch-mismatch`) are deterministic and
+ * are not retried — `withRetry` is not used because it would retry a conflict
+ * that will deterministically fail again, and because it would lose the typed
+ * conflict information. Transient DB errors are wrapped as `db-error`.
+ * @param db - Database instance
+ * @param userId - Authenticated owner user id
+ * @param expectedEpoch - Aggregate epoch captured at acquisition
+ * @param expectedWorkflowVersion - Workflow version captured from the form
+ * @param splitBoundary - The validated eligible boundary id to store
+ * @returns Promise<Result<EtudeParams, EtudeUpdateError>> — conflict kinds are
+ * `version-mismatch`, `epoch-mismatch`, or `db-error`; the caller treats
+ * `version-mismatch` and `epoch-mismatch` as safe stale-form rejections.
+ */
+export const updateEtudeSplit = (
+  db: DrizzleClient,
+  userId: string,
+  expectedEpoch: number,
+  expectedWorkflowVersion: number,
+  splitBoundary: string,
+): Promise<Result<EtudeParams, EtudeUpdateError>> =>
+  updateEtudeSplitActual(db, userId, expectedEpoch, expectedWorkflowVersion, splitBoundary)
+
+const updateEtudeSplitActual = async (
+  db: DrizzleClient,
+  userId: string,
+  expectedEpoch: number,
+  expectedWorkflowVersion: number,
+  splitBoundary: string,
+): Promise<Result<EtudeParams, EtudeUpdateError>> => {
+  try {
+    // Load the current row to compare the submitted boundary against the
+    // stored one. When the submitted boundary is identical to the stored one
+    // AND the expected version matches, the request is a no-op: no version
+    // increment, no write, no flag changes. A stale version on an identical
+    // resubmit is still a version-mismatch.
+    const current = await db
+      .select()
+      .from(etudeParams)
+      .where(eq(etudeParams.userId, userId))
+      .limit(1)
+    if (current.length === 0) {
+      // No aggregate exists for this owner; treat as a safe version-mismatch.
+      return Result.err({ kind: 'version-mismatch' })
+    }
+    const stored = current[0]!
+    if (stored.splitBoundary === splitBoundary) {
+      // Verify the version matches before returning Ok. A stale version on
+      // an identical resubmit is a version-mismatch, not a silent success.
+      if (stored.workflowVersion !== expectedWorkflowVersion) {
+        return Result.err({ kind: 'version-mismatch' })
+      }
+      return Result.ok(mapToDomain(stored))
+    }
+
+    const updated = await db
+      .update(etudeParams)
+      .set({
+        splitBoundary,
+        splitConfirmed: true,
+        workflowVersion: sql`${etudeParams.workflowVersion} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(etudeParams.userId, userId),
+          eq(etudeParams.aggregateEpoch, expectedEpoch),
+          eq(etudeParams.workflowVersion, expectedWorkflowVersion),
+        ),
+      )
+      .returning()
+    if (updated.length === 0) {
+      // The CAS failed: either the epoch or the version no longer matches.
+      // Re-load the current row to disambiguate the conflict kind so the
+      // caller can report the correct failure. If the row is gone, treat it
+      // as a version-mismatch (a safe conflict, never a 500).
+      const reloaded = await db
+        .select()
+        .from(etudeParams)
+        .where(eq(etudeParams.userId, userId))
+        .limit(1)
+      if (reloaded.length === 0) {
+        return Result.err({ kind: 'version-mismatch' })
+      }
+      if (reloaded[0]!.aggregateEpoch !== expectedEpoch) {
+        return Result.err({ kind: 'epoch-mismatch' })
+      }
+      return Result.err({ kind: 'version-mismatch' })
+    }
+    return Result.ok(mapToDomain(updated[0]!))
+  } catch (e) {
+    return Result.err({ kind: 'db-error', error: e instanceof Error ? e : new Error(String(e)) })
+  }
+}
+
+/**
+ * Correctively clear the split boundary of the owner's aggregate (Issue 16).
+ *
+ * Used by the split route's one-hand redirect (a one-hand workflow never
+ * stores a boundary, and any previously stored boundary is cleared) and by
+ * the corrupt-state recovery (a two-hand aggregate holding fewer than two
+ * stored pitches is returned to the notes step, which is treated as
+ * unconfirmed so the student re-selects pitches).
+ *
+ * Unlike `updateEtudeSplit`, this is a corrective clear, not a student
+ * submission: it does NOT increment `workflowVersion` and does NOT require a
+ * version match. It guards only on the aggregate epoch, so a one-hand
+ * redirect or a corrupt-state recovery can clear stale split state even when
+ * the version is unknown. When `unconfirmNotes` is true, `notesConfirmed` is
+ * also set to false (the corrupt-state recovery path); otherwise it is
+ * retained (the one-hand redirect path).
+ *
+ * On a zero-row update (the epoch no longer matches, or the row is gone), the
+ * conflict is disambiguated as `epoch-mismatch` (or `version-mismatch` when
+ * the row is gone). Transient DB errors are wrapped as `db-error`.
+ * @param db - Database instance
+ * @param userId - Authenticated owner user id
+ * @param expectedEpoch - Aggregate epoch captured at acquisition
+ * @param unconfirmNotes - When true, also set `notesConfirmed` to false
+ * @returns Promise<Result<EtudeParams, EtudeUpdateError>> — conflict kinds are
+ * `version-mismatch`, `epoch-mismatch`, or `db-error`.
+ */
+export const clearEtudeSplit = (
+  db: DrizzleClient,
+  userId: string,
+  expectedEpoch: number,
+  unconfirmNotes: boolean,
+): Promise<Result<EtudeParams, EtudeUpdateError>> =>
+  clearEtudeSplitActual(db, userId, expectedEpoch, unconfirmNotes)
+
+const clearEtudeSplitActual = async (
+  db: DrizzleClient,
+  userId: string,
+  expectedEpoch: number,
+  unconfirmNotes: boolean,
+): Promise<Result<EtudeParams, EtudeUpdateError>> => {
+  try {
+    const updated = await db
+      .update(etudeParams)
+      .set({
+        splitBoundary: null,
+        splitConfirmed: false,
+        ...(unconfirmNotes ? { notesConfirmed: false } : {}),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(etudeParams.userId, userId),
+          eq(etudeParams.aggregateEpoch, expectedEpoch),
+        ),
+      )
+      .returning()
+    if (updated.length === 0) {
+      // The epoch guard failed, or the row is gone. Re-load to disambiguate.
+      const reloaded = await db
+        .select()
+        .from(etudeParams)
+        .where(eq(etudeParams.userId, userId))
+        .limit(1)
+      if (reloaded.length === 0) {
+        return Result.err({ kind: 'version-mismatch' })
+      }
+      if (reloaded[0]!.aggregateEpoch !== expectedEpoch) {
+        return Result.err({ kind: 'epoch-mismatch' })
+      }
+      return Result.err({ kind: 'version-mismatch' })
+    }
+    return Result.ok(mapToDomain(updated[0]!))
+  } catch (e) {
+    return Result.err({ kind: 'db-error', error: e instanceof Error ? e : new Error(String(e)) })
+  }
+}

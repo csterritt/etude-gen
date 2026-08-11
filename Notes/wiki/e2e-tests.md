@@ -224,3 +224,16 @@ A catalog and summaries of all end-to-end tests under `e2e-tests/`.
 - Deselecting a duration and submitting works through the server without scripting (valid narrowed set persisted).
 - An impossible duration set is rejected by the server with corrective guidance without scripting (nothing persisted).
 - Select all works through the server without scripting (persists the full pitch set with a page reload).
+
+## etude/20-etude-split-step.spec.ts (Issue 16)
+
+8 Playwright tests covering the Issue 16 split step for the two-hand boundary:
+
+- The two-hand split step renders one radio per eligible boundary (7 for the 8 C-major-octave-4 pitches), plus the hidden workflowVersion field and Save button.
+- A working submission chooses a boundary, persists it, sets splitConfirmed, and redirects 303 to /etude/review.
+- A one-hand workflow skips the split step: a direct GET redirects to the canonical route (review) and no boundary is stored.
+- A direct POST to /etude/split for a one-hand workflow redirects to the canonical route and clears any previously stored boundary.
+- A direct visit while notes are unconfirmed redirects to the notes step.
+- A stale workflow version is rejected and nothing is persisted (splitBoundary null, splitConfirmed false).
+- An invalid boundary id is rejected, nothing is persisted, and the step is redisplayed with a focused error summary and a field-level boundary error.
+- A corrupt-state two-hand aggregate with fewer than two stored pitches redirects to the notes step and unconfirms it (notesConfirmed false, splitBoundary null, splitConfirmed false).

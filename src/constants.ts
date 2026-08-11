@@ -25,6 +25,8 @@ export const PATHS = {
   ETUDE: '/etude' as const,
   ETUDE_SETUP: '/etude/setup' as const,
   ETUDE_NOTES: '/etude/notes' as const,
+  ETUDE_SPLIT: '/etude/split' as const,
+  ETUDE_REVIEW: '/etude/review' as const,
   HEALTH: '/health' as const,
 
   // Auth API paths

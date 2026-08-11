@@ -342,3 +342,30 @@ New test files:
 - `e2e-tests/etude/19-etude-notes-duration-no-script.spec.ts` — 4 Playwright tests with `javaScriptEnabled: false` locking in the no-script guarantee (every toggle usable, impossible set rejected by the server, Select all works through the server).
 
 Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`.
+
+## [2026-08-11] ingest | Issue 16 — split step for the two-hand boundary
+
+Ingested the Issue 16 implementation: the conditional split step for two-hand workflows, including `GET /etude/split` and `POST /etude/split`.
+
+New source files:
+- `src/lib/split-boundary-validator.ts` — pure validation and resolution for the split boundary.
+- `src/routes/build-etude-split.tsx` — the split-step GET/POST route handler.
+
+Extended source files:
+- `src/lib/music-domain.ts` — added `EligibleBoundary` interface and `deriveEligibleBoundaries` function.
+- `src/lib/etude-params-repository.ts` — added `updateEtudeSplit` (CAS save) and `clearEtudeSplit` (corrective clear).
+- `src/lib/canonical-route.ts` — extended `resolveCanonicalRoute` with split, review, and corrupt-state rows.
+- `src/constants.ts` — added `PATHS.ETUDE_SPLIT` and `PATHS.ETUDE_REVIEW`.
+- `src/routes/test/etude-downstream-state.ts` — added optional `notesConfirmed`/`splitConfirmed` overrides for corrupt-state tests.
+- `src/index.ts` — registered `buildEtudeSplit`.
+
+New test files:
+- `tests/split-boundary-validator.spec.ts` — 14 unit tests for validation and resolution.
+- `e2e-tests/etude/20-etude-split-step.spec.ts` — 8 Playwright e2e tests covering the full split-step behavior.
+
+Extended test files:
+- `tests/music-domain.spec.ts` — 8 tests for `deriveEligibleBoundaries`.
+- `tests/etude-params-repository.spec.ts` — 9 tests for `updateEtudeSplit` and `clearEtudeSplit`.
+- `tests/canonical-route.spec.ts` — 9 tests for the split/review/corrupt-state rows and PATHS constants.
+
+Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`.

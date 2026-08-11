@@ -16,6 +16,7 @@ import { renderer } from './renderer'
 import { buildRoot } from './routes/build-root' // PRODUCTION:REMOVE
 import { buildEtude } from './routes/build-etude'
 import { buildEtudeNotes } from './routes/build-etude-notes'
+import { buildEtudeSplit } from './routes/build-etude-split'
 import { build404 } from './routes/build-404'
 import { buildEmailConfirmation } from './routes/auth/build-email-confirmation'
 import { buildAwaitVerification } from './routes/auth/build-await-verification'
@@ -186,6 +187,7 @@ setupBetterAuth(app)
 buildRoot(app) // PRODUCTION:REMOVE
 buildEtude(app)
 buildEtudeNotes(app)
+buildEtudeSplit(app)
 buildSignIn(app)
 if (env.SIGN_UP_MODE === SIGN_UP_MODES.OPEN_SIGN_UP) {
   buildSignUp(app)

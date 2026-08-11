@@ -369,3 +369,26 @@ Extended test files:
 - `tests/canonical-route.spec.ts` — 9 tests for the split/review/corrupt-state rows and PATHS constants.
 
 Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`.
+
+
+## [2026-08-11] ingest | Issue 17 — read-only step summaries and Back links
+
+Ingested the read-only step summary model, shared presentational component, Back links on the notes, split, and stub review routes, and the stub `GET /etude/review` route (issue #17).
+
+New source files:
+- `src/lib/etude-summary.ts` — pure `deriveStepSummary(params, step)` model builder; level-aware (`'notes'`, `'split'`, `'review'`); fields beyond the requested level are absent; never re-derives available pitches, offerable durations, or eligible boundaries; structural `SummaryParams` subset of `EtudeParams`.
+- `src/components/etude-summary.tsx` — shared presentational `EtudeSummary` component; renders a `<section data-testid="etude-summary">` with a `<dl>` of labeled read-only text values; no editable controls; duration tokens rendered via `DURATION_LABELS`; reveals no internal identifiers.
+- `src/routes/build-etude-review.tsx` — stub `GET /etude/review` route; renders the review-level summary and a canonical Back link (`/etude/split` for two-hand, `/etude/notes` for one-hand); redirects to the canonical route when review is not reachable; no POST handler (Issue 19 will replace it).
+
+Modified source files:
+- `src/routes/build-etude-notes.tsx` — added `EtudeSummary` (notes level) above the form; added a Back link anchor (`data-testid="notes-back-action"`) to `/etude/setup` in the card actions; extended `EtudeParamsLike` with `measureCount`, `hand`, `splitBoundary` for the summary.
+- `src/routes/build-etude-split.tsx` — added `EtudeSummary` (split level) above the form; added a Back link anchor (`data-testid="split-back-action"`) to `/etude/notes` in the card actions; extended `EtudeParamsLike` with `measureCount`, `timeSignature`, `hand`, `selectedDurations` for the summary.
+- `src/index.ts` — wired `buildEtudeReview` route.
+
+New test files:
+- `tests/etude-summary.spec.ts` — 16 unit tests for `deriveStepSummary` (notes/split/review levels, one-hand and two-hand, purity, catalog-driven offerable filtering).
+- `e2e-tests/etude/21-etude-notes-summary-back-link.spec.ts` — 5 Playwright e2e tests for the notes-step summary and Back link.
+- `e2e-tests/etude/22-etude-split-summary-back-link.spec.ts` — 5 Playwright e2e tests for the split-step summary and Back link.
+- `e2e-tests/etude/23-etude-review-summary-back-link.spec.ts` — 6 Playwright e2e tests for the stub review-step summary and Back link.
+
+Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`, `project-overview.md`.

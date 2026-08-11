@@ -237,3 +237,34 @@ A catalog and summaries of all end-to-end tests under `e2e-tests/`.
 - A stale workflow version is rejected and nothing is persisted (splitBoundary null, splitConfirmed false).
 - An invalid boundary id is rejected, nothing is persisted, and the step is redisplayed with a focused error summary and a field-level boundary error.
 - A corrupt-state two-hand aggregate with fewer than two stored pitches redirects to the notes step and unconfirms it (notesConfirmed false, splitBoundary null, splitConfirmed false).
+
+## etude/21-etude-notes-summary-back-link.spec.ts (Issue 17)
+
+5 Playwright tests covering the Issue 17 notes-step read-only summary and Back link:
+
+- The notes step renders a read-only summary of the setup answers as text with no editable controls (measures, meter, key, hands, octaves all present; the summary region contains zero `input`/`select`/`textarea`/`button` elements).
+- The summary values match the saved state (asserted against known submitted values and the aggregate-state route's hand field).
+- A Back link is present as an anchor (`<a>`) issuing a GET to `/etude/setup`; following it lands on the setup step.
+- Unsaved edits on the notes page are discarded after following Back (an unchecked pitch without submission is not persisted; the saved selection is unchanged).
+- After an upstream setup change (key changed to G major), the summary reflects the new saved values.
+
+## etude/22-etude-split-summary-back-link.spec.ts (Issue 17)
+
+5 Playwright tests covering the Issue 17 split-step read-only summary and Back link:
+
+- The split step renders a read-only summary of setup and notes answers as text with no editable controls (setup fields plus pitches and durations; the summary region contains zero editable elements).
+- The summary shows both pitches and durations together, never one alone (the full C-major-octave-4 pitch set is shown; the durations field is non-empty).
+- The summary values match the saved state (every stored pitch appears in the summary; the stored durations are reflected).
+- A Back link is present as an anchor issuing a GET to `/etude/notes`; following it lands on the notes step.
+- Unsaved split edits are discarded after following Back (a checked boundary radio without submission is not persisted; splitBoundary is null and splitConfirmed is false).
+
+## etude/23-etude-review-summary-back-link.spec.ts (Issue 17)
+
+6 Playwright tests covering the Issue 17 stub review-step read-only summary and Back link:
+
+- Two-hand: the review step renders a read-only summary with the boundary and each hand pitch set (setup, notes, and split fields all present; the summary contains no editable controls).
+- Two-hand: the Back link is an anchor issuing a GET to `/etude/split`; following it lands on the split step.
+- One-hand: the review step renders a summary without the boundary and hand pitch sets (the split-boundary, left-hand-pitches, and right-hand-pitches testids have count 0).
+- One-hand: the Back link is an anchor issuing a GET to `/etude/notes`; following it lands on the notes step.
+- A direct GET to `/etude/review` when prerequisites are unmet (notes unconfirmed) redirects 303 to the canonical route (notes).
+- The summary values match the saved state (the stored split boundary is reflected in the summary).

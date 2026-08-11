@@ -47,6 +47,7 @@ import { redirectWithError, redirectWithMessage } from '../lib/redirects'
 import { shapeRedisplayPayload, type FieldError } from '../lib/safe-redisplay'
 import { redirectWithValidationState, consumeValidationStateFromRequest } from '../lib/validation-state-helpers'
 import { ErrorSummary, buildErrorSummaryEntries, type ErrorSummaryEntry } from '../components/error-summary'
+import { EtudeSummary } from '../components/etude-summary'
 import { buildErrorSummaryFocusScript } from '../lib/error-summary-focus'
 import {
   validateSplitBoundary,
@@ -115,13 +116,19 @@ const renderFieldErrors = (entries: ErrorSummaryEntry[], field: string) => {
 /**
  * Minimal interface for the aggregate fields the split form reads. Avoids
  * importing the full `EtudeParams` type (which carries DB-specific fields the
- * form does not touch).
+ * form does not touch). Includes the fields the read-only summary needs
+ * (measureCount, timeSignature, hand, selectedDurations) so the summary can
+ * be rendered from the same params.
  */
 interface EtudeParamsLike {
+  measureCount: number
+  timeSignature: string
   keySignature: string
   selectedOctaves: string
   selectedPitches: string | null
+  selectedDurations: string | null
   splitBoundary: string | null
+  hand: string
   workflowVersion: number
 }
 
@@ -186,6 +193,7 @@ const renderEtudeSplitForm = (
       <div className='card w-full max-w-md bg-base-100 shadow-xl'>
         <div className='card-body'>
           <h2 className='card-title text-2xl font-bold mb-4'>Split hands</h2>
+          <EtudeSummary params={params} step='split' />
           <p className='text-gray-600 mb-6'>
             Choose where the left hand ends and the right hand begins. Lower
             pitches go to the left hand; higher pitches go to the right.
@@ -234,6 +242,13 @@ const renderEtudeSplitForm = (
               {renderFieldErrors(entries, 'boundary')}
             </fieldset>
             <div className='card-actions justify-end gap-2'>
+              <a
+                href={PATHS.ETUDE_NOTES}
+                className='btn btn-ghost'
+                data-testid='split-back-action'
+              >
+                Back
+              </a>
               <button
                 type='submit'
                 name='action'

@@ -44,6 +44,7 @@ import { redirectWithError, redirectWithMessage } from '../lib/redirects'
 import { shapeRedisplayPayload, type FieldError } from '../lib/safe-redisplay'
 import { redirectWithValidationState, consumeValidationStateFromRequest } from '../lib/validation-state-helpers'
 import { ErrorSummary, buildErrorSummaryEntries, type ErrorSummaryEntry } from '../components/error-summary'
+import { EtudeSummary } from '../components/etude-summary'
 import { buildErrorSummaryFocusScript } from '../lib/error-summary-focus'
 import {
   validatePitchSelection,
@@ -188,6 +189,7 @@ const renderEtudeNotesForm = (
       <div className='card w-full max-w-md bg-base-100 shadow-xl'>
         <div className='card-body'>
           <h2 className='card-title text-2xl font-bold mb-4'>Select notes</h2>
+          <EtudeSummary params={params} step='notes' />
           <p className='text-gray-600 mb-6'>
             Choose the pitches and durations to include in your etude.
           </p>
@@ -271,6 +273,13 @@ const renderEtudeNotesForm = (
               {renderFieldErrors(entries, 'durations')}
             </fieldset>
             <div className='card-actions justify-end gap-2'>
+              <a
+                href={PATHS.ETUDE_SETUP}
+                className='btn btn-ghost'
+                data-testid='notes-back-action'
+              >
+                Back
+              </a>
               <button
                 type='submit'
                 name='action'
@@ -310,14 +319,18 @@ const renderEtudeNotesForm = (
 /**
  * Minimal interface for the aggregate fields the notes form reads. Avoids
  * importing the full `EtudeParams` type (which carries DB-specific fields the
- * form does not touch).
+ * form does not touch). Includes the fields the read-only summary needs
+ * (measureCount, hand) so the summary can be rendered from the same params.
  */
 interface EtudeParamsLike {
+  measureCount: number
   keySignature: string
   selectedOctaves: string
   selectedPitches: string | null
   selectedDurations: string | null
+  splitBoundary: string | null
   timeSignature: string
+  hand: string
   workflowVersion: number
 }
 

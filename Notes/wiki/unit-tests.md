@@ -460,3 +460,15 @@ The catalog contribution built from the real packaged catalog by `buildCatalogHe
 - Routes to /etude/notes when both hands, notes confirmed, fewer than two stored pitches (corrupt state).
 - Routes to /etude/notes when both hands, notes confirmed, no stored pitches (corrupt state).
 - Still routes to /etude/notes when both hands and notes are unconfirmed.
+
+## etude-summary.spec.ts (Issue 17)
+
+16 tests covering `deriveStepSummary` from `src/lib/etude-summary.ts`:
+
+- Notes level: includes setup fields (measures, meter, key, octaves, hand); omits pitches, durations, boundary, and hand pitch sets.
+- Split level: includes setup and notes fields (pitches, durations); omits boundary and hand pitch sets.
+- Review level (two-hand): includes setup, notes, and split fields (boundary, left/right hand pitch sets) when a boundary applies and at least two pitches are selected.
+- Review level (one-hand): omits the boundary and hand pitch sets because no boundary applies.
+- Review level (two-hand, fewer than two pitches): omits the boundary and hand pitch sets.
+- Purity: does not mutate its argument; does not throw for any step level on an empty aggregate.
+- Catalog-driven offerable filtering: uses the packaged rhythm catalog to filter durations for the meter (loads the real catalog via `loadRhythmCatalog`).

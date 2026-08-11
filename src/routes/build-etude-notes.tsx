@@ -129,6 +129,7 @@ const renderFieldErrors = (entries: ErrorSummaryEntry[], field: string) => {
 const renderEtudeNotesForm = (
   params: EtudeParamsLike,
   offerableDurations: string[],
+  meterPatterns: readonly string[],
   redisplay?: RedisplayData,
 ) => {
   const safeValues = redisplay?.safeValues ?? {}
@@ -254,6 +255,12 @@ const renderEtudeNotesForm = (
                         className='checkbox checkbox-sm'
                       />
                       <span className='label-text'>{DURATION_LABELS[token] ?? token}</span>
+                      <span
+                        data-testid={`duration-reason-${token}`}
+                        id={`duration-reason-${token}`}
+                        className='text-xs text-gray-500'
+                      >
+                      </span>
                     </label>
                   )
                 })}
@@ -284,6 +291,16 @@ const renderEtudeNotesForm = (
               </button>
             </div>
           </form>
+          <span
+            data-testid='duration-live-region'
+            aria-live='polite'
+            className='sr-only'
+          >
+          </span>
+          {raw(
+            `<script type="application/json" id="notes-rhythm-data" data-testid="notes-rhythm-data">${JSON.stringify({ meter: params.timeSignature, patterns: meterPatterns })}</script>`,
+          )}
+          <script src='/notes-enhancement.js' defer={true} />
         </div>
       </div>
     </div>
@@ -367,9 +384,18 @@ export const buildEtudeNotes = (app: Hono<{ Bindings: any }>): void => {
       // never a 500.
       const catalog = loadRhythmCatalog(RHYTHM_CATALOG_TEXT)
       const offerableDurations = computeOfferableDurations(catalog, result.value.timeSignature)
+      const meterPatterns = catalog.meters[result.value.timeSignature] ?? []
 
       return c.render(
-        useLayout(c, renderEtudeNotesForm(result.value, offerableDurations, redisplay)),
+        useLayout(
+          c,
+          renderEtudeNotesForm(
+            result.value,
+            offerableDurations,
+            meterPatterns,
+            redisplay,
+          ),
+        ),
       )
     },
   )

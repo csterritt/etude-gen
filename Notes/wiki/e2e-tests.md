@@ -193,3 +193,34 @@ A catalog and summaries of all end-to-end tests under `e2e-tests/`.
 - An empty duration selection is rejected with "Select at least one duration." and nothing is persisted.
 - A stale workflow version is rejected and the currently saved durations are shown (not the submitted stale ones).
 - The notes step is complete only after both pitches and durations are confirmed: Select all alone keeps the step incomplete (still routed to /etude/notes); a combined save then confirms the step and the canonical route no longer returns /etude/notes.
+
+## etude/17-etude-notes-duration-enhancement.spec.ts (Issue 15)
+
+8 Playwright tests covering the Issue 15 duration-toggle progressive enhancement with JavaScript enabled:
+
+- After deselecting durations until a toggle is required, it is marked `aria-disabled="true"` (not native `disabled`); the non-required toggle is not disabled.
+- An `aria-disabled` toggle remains focusable via keyboard and stays in the accessibility tree.
+- An `aria-disabled` toggle exposes `aria-describedby` resolving to visible reason text (not a `title` attribute or colour alone).
+- The disabled set is correct on first paint before any interaction (a stored {E, R} selection shows E disabled on load).
+- A state change is announced through a polite live region (`aria-live="polite"`).
+- Clicking an `aria-disabled` toggle does not deselect it (suppressed client-side).
+- Re-selecting a previously removed duration clears the disabled state and the live region announces it.
+- All pitches remain selected by default on the enhanced page.
+
+## etude/18-etude-notes-enhancement-select-all-bypass.spec.ts (Issue 15)
+
+4 Playwright tests covering the Issue 15 Select all enhancement, init-failure, and scripted bypass:
+
+- Select all with scripting selects every pitch without a page reload (verified via a window marker that survives only if no navigation occurs).
+- A simulated initialization failure (corrupted JSON data block via route interception) leaves every duration toggle fully usable — none carry `aria-disabled`, and E can be unchecked.
+- A simulated initialization failure (enhancement script blocked via 404 route) leaves every duration toggle fully usable.
+- A scripted bypass that forcibly removes `aria-disabled`, unchecks the disabled toggle, and submits an impossible set still hits the Issue 14 server rejection with corrective guidance and no persistence.
+
+## etude/19-etude-notes-duration-no-script.spec.ts (Issue 15)
+
+4 Playwright tests with JavaScript disabled (`test.use({ javaScriptEnabled: false })`) locking in the no-script guarantee:
+
+- Every duration toggle is usable without scripting (no `aria-disabled`, no native `disabled`).
+- Deselecting a duration and submitting works through the server without scripting (valid narrowed set persisted).
+- An impossible duration set is rejected by the server with corrective guidance without scripting (nothing persisted).
+- Select all works through the server without scripting (persists the full pitch set with a page reload).

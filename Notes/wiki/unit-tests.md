@@ -391,3 +391,19 @@ The catalog contribution built from the real packaged catalog by `buildCatalogHe
 - Wraps an injected update failure as a `db-error` and persists nothing.
 - An identical resubmit is a no-op (no version increment, `notesConfirmed` unchanged).
 - A stale-version resubmit of identical values is still a `version-mismatch`.
+
+## duration-disabled-set.spec.ts (Issue 15)
+
+12 tests covering the pure `computeDisabledDurations` function from `src/lib/duration-disabled-set.ts`:
+- Marks a token disabled when removing it eliminates every eligible pattern (E required by both patterns).
+- Returns an empty disabled set when every selected token can be removed and a pattern remains.
+- Marks the only selected token as disabled (removing it leaves the empty set, which has no eligible pattern).
+- Marks multiple tokens disabled when each is individually required (single pattern requiring all three).
+- Marks only the shared-dependency token disabled when one of two patterns shares it.
+- Returns disabled tokens in canonical order regardless of selection order.
+- Does not mutate the `selectedTokens` set.
+- Does not mutate the `patterns` array.
+- Returns an empty array when there are no patterns (nothing is required).
+- Returns an empty array when the selection is empty.
+- Does not mark a token disabled if a pattern uses only that token and it remains.
+- Handles a token in the selection that appears in no pattern (not disabled, since removing it changes nothing).

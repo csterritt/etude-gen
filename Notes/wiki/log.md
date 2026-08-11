@@ -323,3 +323,22 @@ Modified test files:
 - `e2e-tests/etude/15-etude-notes-pitch-selection.spec.ts` — updated the ordinary-save pitch tests to also submit a valid duration set, since Issue 14 made the notes step coherent (the ordinary save requires both halves).
 
 Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`, `project-overview.md`.
+
+## [2026-08-11] ingest | issue-015 duration toggle progressive enhancement
+
+Ingested the Issue 15 progressive enhancement for duration toggles and Select all — the strictly additive client-side enhancement that prevents a student from reaching review with an impossible rhythm set, while leaving the server-side validation from Issue 14 authoritative and the no-script path unchanged.
+
+New source files:
+- `src/lib/duration-disabled-set.ts` — pure `computeDisabledDurations(selectedTokens, meterPatterns)` function returning the duration tokens whose deselection would leave no eligible complete-measure pattern; canonical-ordered, pure (no mutation, no throws), no catalog I/O (caller supplies patterns).
+- `public/notes-enhancement.js` — self-contained, guarded client enhancement script served as a static asset via the Workers ASSETS binding (permitted by the existing `scriptSrc 'self'` CSP). Computes the disabled set on first paint from the server-rendered state, marks toggles with `aria-disabled="true"` (never native `disabled`), wires `aria-describedby` to visible reason text, announces state changes via a polite live region, suppresses deselection of disabled toggles, and enhances Select all to check every pitch in place without a server round trip. Wraps initialization in try/catch so any failure leaves every toggle fully usable; adds no client-side authority over validation, ownership, or persisted state.
+
+Modified source files:
+- `src/routes/build-etude-notes.tsx` — `renderEtudeNotesForm` now takes the meter's catalog patterns and embeds them as a non-executing JSON data block (`<script type="application/json" id="notes-rhythm-data">`); each duration toggle has a sibling reason-text span (`id="duration-reason-<token>"`); a polite live region (`data-testid="duration-live-region"`, `aria-live="polite"`) is rendered; the enhancement script is referenced via `<script src="/notes-enhancement.js" defer>`. The GET handler passes `catalog.meters[timeSignature]` to the render function. No POST behavior or no-script-visible control behavior changed.
+
+New test files:
+- `tests/duration-disabled-set.spec.ts` — 12 Bun tests covering the pure disabled-set algorithm (required-token detection, empty cases, canonical ordering, non-mutation, single-selection, multi-required, shared-dependency, no-pattern, no-selection, irrelevant-token).
+- `e2e-tests/etude/17-etude-notes-duration-enhancement.spec.ts` — 8 Playwright tests (JS enabled) covering aria-disabled marking, focusability, aria-describedby to visible reason text, first-paint correctness, polite live region announcements, click suppression, and state-change clearing.
+- `e2e-tests/etude/18-etude-notes-enhancement-select-all-bypass.spec.ts` — 4 Playwright tests covering Select all without a page reload, init failure via corrupted data and via blocked script, and scripted bypass still hitting the Issue 14 server rejection.
+- `e2e-tests/etude/19-etude-notes-duration-no-script.spec.ts` — 4 Playwright tests with `javaScriptEnabled: false` locking in the no-script guarantee (every toggle usable, impossible set rejected by the server, Select all works through the server).
+
+Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`.

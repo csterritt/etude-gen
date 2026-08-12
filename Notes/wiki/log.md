@@ -392,3 +392,27 @@ New test files:
 - `e2e-tests/etude/23-etude-review-summary-back-link.spec.ts` — 6 Playwright e2e tests for the stub review-step summary and Back link.
 
 Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`, `project-overview.md`.
+
+
+## [2026-08-11] ingest | Issue 18 — prerequisite redirects to the earliest incomplete step
+
+Ingested the Issue 18 implementation: the workflow service that wraps `resolveCanonicalRoute` with value-validation, the safe prerequisite-redirect message, the dedicated cookie and layout alert, and the consolidated route guards.
+
+New source files:
+- `src/lib/workflow-service.ts` — `computeCanonicalRoute(params)` wraps `resolveCanonicalRoute` with value-validation for stored downstream selections; exports `PREREQUISITE_REDIRECT_MESSAGE`.
+
+Extended source files:
+- `src/lib/music-domain.ts` — added `parseStoredPitches(stored)` helper (shared by the split route and the workflow service).
+- `src/lib/redirects.tsx` — added `redirectWithPrerequisiteMessage` helper (sets a dedicated `PREREQUISITE_REDIRECT_FOUND` cookie).
+- `src/constants.ts` — added `COOKIES.PREREQUISITE_REDIRECT_FOUND`.
+- `src/routes/build-layout.tsx` — renders the prerequisite-redirect message in a dedicated alert with `data-testid="prerequisite-redirect-message"`.
+- `src/routes/build-etude.tsx` — `GET /etude` now calls `computeCanonicalRoute` instead of `resolveCanonicalRoute`.
+- `src/routes/build-etude-notes.tsx` — GET and POST prerequisite guards now use `computeCanonicalRoute` and `redirectWithPrerequisiteMessage`.
+- `src/routes/build-etude-split.tsx` — GET and POST prerequisite guards consolidated into a single `computeCanonicalRoute` guard; one-hand clear and corrupt-state recovery triggered from the redirect branch; local `parseStoredPitches` removed in favor of the shared `music-domain` helper.
+- `src/routes/build-etude-review.tsx` — prerequisite guard now uses `computeCanonicalRoute` and `redirectWithPrerequisiteMessage`.
+
+New test files:
+- `tests/workflow-service.spec.ts` — 25 unit tests for `computeCanonicalRoute` and `PREREQUISITE_REDIRECT_MESSAGE`.
+- `e2e-tests/etude/24-etude-prerequisite-redirect.spec.ts` — 8 Playwright e2e tests covering prerequisite redirects with safe messages across all workflow states and stored-values-invalid rows.
+
+Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`, `project-overview.md`.

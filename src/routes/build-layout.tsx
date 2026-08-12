@@ -34,6 +34,14 @@ export const useLayout = (
   if (error) {
     removeCookie(c, COOKIES.ERROR_FOUND)
   }
+  // Prerequisite-redirect message (Issue 18): a safe explanatory message
+  // shown when a student is redirected from a directly requested step to the
+  // earliest incomplete step. Rendered with a dedicated testid so tests can
+  // distinguish it from ordinary success/error messages.
+  const prerequisiteRedirect = retrieveCookie(c, COOKIES.PREREQUISITE_REDIRECT_FOUND)
+  if (prerequisiteRedirect) {
+    removeCookie(c, COOKIES.PREREQUISITE_REDIRECT_FOUND)
+  }
 
   // Set content type header
   c.header('Content-Type', 'text/html; charset=utf-8')
@@ -116,6 +124,29 @@ export const useLayout = (
             />
           </svg>
           <span className='align-middle'>{error}</span>
+        </div>
+      )}
+
+      {prerequisiteRedirect && (
+        <div
+          className='alert alert-info mx-auto mt-4'
+          role='alert'
+          data-testid='prerequisite-redirect-message'
+        >
+          <svg
+            xmlns='http://www.w3.org/2000/svg'
+            className='h-6 w-6 shrink-0 stroke-current'
+            fill='none'
+            viewBox='0 0 24 24'
+          >
+            <path
+              stroke-linecap='round'
+              stroke-linejoin='round'
+              stroke-width='2'
+              d='M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+            />
+          </svg>
+          <span className='align-middle'>{prerequisiteRedirect}</span>
         </div>
       )}
 

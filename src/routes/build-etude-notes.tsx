@@ -35,12 +35,12 @@ import { type AppEnv, type AuthUser, type DrizzleClient } from '../local-types'
 import { useLayout } from './build-layout'
 import { signedInAccess } from '../middleware/signed-in-access'
 import { loadEtudeParams, updateEtudePitches, updateEtudeNotes } from '../lib/etude-params-repository'
-import { resolveCanonicalRoute } from '../lib/canonical-route'
+import { computeCanonicalRoute, isStepReachable, PREREQUISITE_REDIRECT_MESSAGE } from '../lib/workflow-service'
 import { handleUnexpectedError } from './build-safe-error'
 import { logError, sanitizeError } from '../lib/logger'
 import { deriveAvailablePitches, parseStoredOctaves } from '../lib/music-domain'
 import { parseWorkflowVersionField } from '../lib/workflow-version-field'
-import { redirectWithError, redirectWithMessage } from '../lib/redirects'
+import { redirectWithError, redirectWithMessage, redirectWithPrerequisiteMessage } from '../lib/redirects'
 import { shapeRedisplayPayload, type FieldError } from '../lib/safe-redisplay'
 import { redirectWithValidationState, consumeValidationStateFromRequest } from '../lib/validation-state-helpers'
 import { ErrorSummary, buildErrorSummaryEntries, type ErrorSummaryEntry } from '../components/error-summary'
@@ -362,12 +362,15 @@ export const buildEtudeNotes = (app: Hono<{ Bindings: any }>): void => {
         return redirectWithMessage(c, PATHS.ETUDE, '')
       }
 
-      // Setup not confirmed: redirect to the canonical route (which will be
-      // /etude/setup) so the student completes setup before reaching the
-      // notes step.
-      if (!result.value.setupConfirmed) {
-        const canonical = resolveCanonicalRoute(result.value)
-        return redirectWithMessage(c, canonical, '')
+      // If the notes step's prerequisites are not met, redirect to the
+      // canonical route with a safe prerequisite-redirect message. This
+      // covers setup-unconfirmed and any state where the notes step is not
+      // reachable (cross-cutting contract section 5). A completed notes step
+      // remains visitable for editing even when the canonical route has moved
+      // past it.
+      if (!isStepReachable(result.value, PATHS.ETUDE_NOTES)) {
+        const canonical = computeCanonicalRoute(result.value)
+        return redirectWithPrerequisiteMessage(c, canonical, PREREQUISITE_REDIRECT_MESSAGE)
       }
 
       // Consume any pending validation-state record from a rejected POST.
@@ -464,9 +467,12 @@ export const buildEtudeNotes = (app: Hono<{ Bindings: any }>): void => {
       if (loadResult.value === null) {
         return redirectWithMessage(c, PATHS.ETUDE, '')
       }
-      if (!loadResult.value.setupConfirmed) {
-        const canonical = resolveCanonicalRoute(loadResult.value)
-        return redirectWithMessage(c, canonical, '')
+      // If the notes step's prerequisites are not met, redirect with a safe
+      // prerequisite-redirect message. This covers setup-unconfirmed and any
+      // state where the notes step is not reachable.
+      if (!isStepReachable(loadResult.value, PATHS.ETUDE_NOTES)) {
+        const canonical = computeCanonicalRoute(loadResult.value)
+        return redirectWithPrerequisiteMessage(c, canonical, PREREQUISITE_REDIRECT_MESSAGE)
       }
 
       const params = loadResult.value

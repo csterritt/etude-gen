@@ -472,3 +472,13 @@ The catalog contribution built from the real packaged catalog by `buildCatalogHe
 - Review level (two-hand, fewer than two pitches): omits the boundary and hand pitch sets.
 - Purity: does not mutate its argument; does not throw for any step level on an empty aggregate.
 - Catalog-driven offerable filtering: uses the packaged rhythm catalog to filter durations for the meter (loads the real catalog via `loadRhythmCatalog`).
+
+## workflow-service.spec.ts (Issue 18)
+
+43 tests covering `computeCanonicalRoute`, `isStepReachable`, and `PREREQUISITE_REDIRECT_MESSAGE` from `src/lib/workflow-service.ts`:
+
+- `computeCanonicalRoute` delegates the ordering rows to `resolveCanonicalRoute`: no aggregate → /etude/setup; setup-unconfirmed → /etude/setup; setup-confirmed, notes-unconfirmed → /etude/notes; one-hand, notes-confirmed → /etude/review (split skipped); both-hands, notes-confirmed, split-unconfirmed → /etude/split; both-hands, notes-confirmed, split-confirmed → /etude/review.
+- `computeCanonicalRoute` value-validation rows: invalid stored pitches (a pitch not in the available set) redirect to /etude/notes; invalid stored durations (a token not offerable for the meter) redirect to /etude/notes; invalid stored boundary (not among the eligible boundaries) redirects to /etude/split; invalid boundary with invalid pitches redirects to /etude/notes (earliest invalid step wins).
+- `isStepReachable`: returns true for /etude/setup when an aggregate exists (always reachable); returns true for a completed step (student can revisit to edit); returns false for /etude/split when one hand (split is skipped); returns false for later steps when prerequisites are not met; returns false when stored values are invalid.
+- The `PREREQUISITE_REDIRECT_MESSAGE` is non-empty and exposes no internal state or identifiers (no ids, version numbers, epoch values, pitch names, or boundary ids).
+- Purity: does not mutate its argument; does not throw for hostile input shapes or null aggregate.

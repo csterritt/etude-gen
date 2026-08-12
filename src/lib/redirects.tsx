@@ -52,3 +52,28 @@ export const redirectWithError = <E extends { Bindings: Bindings }>(
   response.headers.append('Set-Cookie', cookieValue)
   return response
 }
+
+/**
+ * Helper function to redirect with a prerequisite-redirect message cookie
+ * (Issue 18). The message is rendered with
+ * `data-testid='prerequisite-redirect-message'` so tests can distinguish it
+ * from ordinary success/error messages. The message must expose no internal
+ * state or identifiers.
+ * @param c - Hono context
+ * @param redirectUrl - URL to redirect to
+ * @param message - The safe prerequisite-redirect message to display
+ * @returns Response object with redirect and cookie
+ */
+export const redirectWithPrerequisiteMessage = <E extends { Bindings: Bindings }>(
+  c: Context<E>,
+  redirectUrl: string,
+  message: string,
+): Response => {
+  const response = c.redirect(redirectUrl, HTML_STATUS.SEE_OTHER)
+  const cookieOptions = Object.entries(COOKIES.STANDARD_COOKIE_OPTIONS)
+    .map(([key, value]) => `${key}=${value}`)
+    .join('; ')
+  const cookieValue = `${COOKIES.PREREQUISITE_REDIRECT_FOUND}=${encodeURIComponent(message)}; ${cookieOptions}`
+  response.headers.append('Set-Cookie', cookieValue)
+  return response
+}

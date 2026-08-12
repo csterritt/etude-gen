@@ -31,7 +31,7 @@ import { useLayout } from './build-layout'
 import { signedInAccess } from '../middleware/signed-in-access'
 import { loadOrCreateEtudeParams, loadEtudeParams, updateEtudeSetup } from '../lib/etude-params-repository'
 import type { EtudeParams } from '../lib/etude-params-repository'
-import { resolveCanonicalRoute } from '../lib/canonical-route'
+import { computeCanonicalRoute } from '../lib/workflow-service'
 import { handleUnexpectedError } from './build-safe-error'
 import { logError, sanitizeError } from '../lib/logger'
 import { validateSetup, SUPPORTED_METERS, SUPPORTED_HANDS } from '../lib/setup-validator'
@@ -371,7 +371,7 @@ export const buildEtude = (app: Hono<{ Bindings: Bindings }>): void => {
         return handleUnexpectedError(c as unknown as Context<AppEnv>, result.error)
       }
 
-      const canonicalRoute = resolveCanonicalRoute(result.value)
+      const canonicalRoute = computeCanonicalRoute(result.value)
       return redirectWithMessage(c, canonicalRoute, '')
     },
   )

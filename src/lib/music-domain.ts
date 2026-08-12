@@ -124,6 +124,25 @@ export const parseStoredOctaves = (stored: string): number[] => {
 }
 
 /**
+ * Parse the stored `selectedPitches` comma-separated string into an ordered
+ * array of pitch names. Null or empty yields an empty array. Whitespace
+ * around individual pitches is trimmed and empty segments are dropped.
+ * Shared by the split route and the workflow service so both derive the same
+ * selected-pitch list from the same stored string.
+ * @param stored - The stored `selectedPitches` string (e.g. "C4,D4,E4"), or null
+ * @returns A trimmed string array of pitch names (possibly empty)
+ */
+export const parseStoredPitches = (stored: string | null): string[] => {
+  if (stored === null || stored.trim() === '') {
+    return []
+  }
+  return stored
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '')
+}
+
+/**
  * Derive the contiguous expanded range from an octave selection. The min
  * and max are the lowest and highest selected octaves; every octave
  * between them is included in the expanded range regardless of whether it

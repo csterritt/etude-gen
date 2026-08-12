@@ -28,10 +28,10 @@ import { type AppEnv, type AuthUser, type DrizzleClient } from '../local-types'
 import { useLayout } from './build-layout'
 import { signedInAccess } from '../middleware/signed-in-access'
 import { loadEtudeParams } from '../lib/etude-params-repository'
-import { resolveCanonicalRoute } from '../lib/canonical-route'
+import { computeCanonicalRoute, isStepReachable, PREREQUISITE_REDIRECT_MESSAGE } from '../lib/workflow-service'
 import { handleUnexpectedError } from './build-safe-error'
 import { logError, sanitizeError } from '../lib/logger'
-import { redirectWithError, redirectWithMessage } from '../lib/redirects'
+import { redirectWithError, redirectWithMessage, redirectWithPrerequisiteMessage } from '../lib/redirects'
 import { EtudeSummary } from '../components/etude-summary'
 
 /**
@@ -101,15 +101,14 @@ export const buildEtudeReview = (app: Hono<{ Bindings: any }>): void => {
 
       const params = result.value
 
-      // If the canonical route for the current state is not /etude/review,
-      // redirect to the canonical route. This single guard covers
-      // setup-unconfirmed, notes-unconfirmed, two-hand-split-unconfirmed,
-      // and the corrupt-state fewer-than-two-pitches rows (cross-cutting
-      // contract section 5: any direct GET for a step that is not reachable
-      // redirects to the canonical route).
-      const canonical = resolveCanonicalRoute(params)
-      if (canonical !== PATHS.ETUDE_REVIEW) {
-        return redirectWithMessage(c, canonical, '')
+      // If the review step's prerequisites are not met, redirect to the
+      // canonical route with a safe prerequisite-redirect message. This
+      // covers setup-unconfirmed, notes-unconfirmed, two-hand-split-
+      // unconfirmed, corrupt-state fewer-than-two-pitches, and
+      // stored-values-invalid rows (cross-cutting contract section 5).
+      if (!isStepReachable(params, PATHS.ETUDE_REVIEW)) {
+        const canonical = computeCanonicalRoute(params)
+        return redirectWithPrerequisiteMessage(c, canonical, PREREQUISITE_REDIRECT_MESSAGE)
       }
 
       return c.render(useLayout(c, renderEtudeReviewStub(params)))

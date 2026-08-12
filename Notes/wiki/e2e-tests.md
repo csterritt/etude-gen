@@ -268,3 +268,18 @@ A catalog and summaries of all end-to-end tests under `e2e-tests/`.
 - One-hand: the Back link is an anchor issuing a GET to `/etude/notes`; following it lands on the notes step.
 - A direct GET to `/etude/review` when prerequisites are unmet (notes unconfirmed) redirects 303 to the canonical route (notes).
 - The summary values match the saved state (the stored split boundary is reflected in the summary).
+
+## etude/24-etude-prerequisite-redirect.spec.ts (Issue 18)
+
+8 Playwright tests covering the Issue 18 prerequisite-redirect behavior — direct GETs to later steps redirect to the earliest incomplete step with a safe message:
+
+- Fresh aggregate (no steps confirmed): direct GET to /etude/notes, /etude/split, /etude/review, and /etude all redirect 303 to /etude/setup; following the redirect to /etude/notes displays a safe prerequisite-redirect message via `data-testid="prerequisite-redirect-message"`.
+- Setup confirmed, notes unconfirmed: /etude/setup renders normally; direct GET to /etude/split, /etude/review, and /etude redirect to /etude/notes; following the redirect displays a safe message.
+- Pitches confirmed but durations unconfirmed: direct GET to later steps redirects to /etude/notes; following the redirect displays a safe message.
+- Notes confirmed, one hand (split skipped): /etude/review renders normally; direct GET to /etude/split and /etude redirect to /etude/review; following the redirect displays a safe message.
+- Notes confirmed, both hands, split unconfirmed: /etude/split renders normally; direct GET to /etude/review and /etude redirect to /etude/split; following the redirect displays a safe message.
+- All confirmed (both hands, split confirmed): /etude/review renders normally with no prerequisite-redirect message; /etude redirects to /etude/review (entry point, no message).
+- Stored values no longer validate — invalid stored pitches: a seeded state with a stored pitch not in the available set redirects to /etude/notes; following the redirect displays a safe message.
+- Stored values no longer validate — invalid stored boundary: a seeded state with a stored boundary not among the eligible boundaries redirects to /etude/split; following the redirect displays a safe message.
+
+The safe-message assertions check that the message text is non-empty and contains no internal state or identifiers (no `ep-`, `user-`, `workflowVersion`, `aggregateEpoch`, pitch names like `C4`, or boundary ids with `|`).

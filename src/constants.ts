@@ -83,6 +83,12 @@ export const COOKIES = {
   MESSAGE_FOUND: 'MESSAGE_FOUND',
   // Error message cookie
   ERROR_FOUND: 'ERROR_FOUND',
+  // Prerequisite-redirect message cookie (Issue 18). Carries the safe
+  // explanatory message shown when a student is redirected from a directly
+  // requested step to the earliest incomplete step. Rendered with
+  // `data-testid='prerequisite-redirect-message'` so tests can distinguish
+  // it from ordinary success/error messages.
+  PREREQUISITE_REDIRECT_FOUND: 'PREREQUISITE_REDIRECT_FOUND',
   // Email entered cookie
   EMAIL_ENTERED: 'EMAIL_ENTERED',
 

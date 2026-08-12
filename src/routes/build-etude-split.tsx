@@ -38,12 +38,12 @@ import {
   updateEtudeSplit,
   clearEtudeSplit,
 } from '../lib/etude-params-repository'
-import { resolveCanonicalRoute } from '../lib/canonical-route'
+import { computeCanonicalRoute, isStepReachable, PREREQUISITE_REDIRECT_MESSAGE } from '../lib/workflow-service'
 import { handleUnexpectedError } from './build-safe-error'
 import { logError, sanitizeError } from '../lib/logger'
-import { deriveAvailablePitches, parseStoredOctaves, deriveEligibleBoundaries, type EligibleBoundary } from '../lib/music-domain'
+import { deriveAvailablePitches, parseStoredOctaves, parseStoredPitches, deriveEligibleBoundaries, type EligibleBoundary } from '../lib/music-domain'
 import { parseWorkflowVersionField } from '../lib/workflow-version-field'
-import { redirectWithError, redirectWithMessage } from '../lib/redirects'
+import { redirectWithError, redirectWithMessage, redirectWithPrerequisiteMessage } from '../lib/redirects'
 import { shapeRedisplayPayload, type FieldError } from '../lib/safe-redisplay'
 import { redirectWithValidationState, consumeValidationStateFromRequest } from '../lib/validation-state-helpers'
 import { ErrorSummary, buildErrorSummaryEntries, type ErrorSummaryEntry } from '../components/error-summary'
@@ -130,20 +130,6 @@ interface EtudeParamsLike {
   splitBoundary: string | null
   hand: string
   workflowVersion: number
-}
-
-/**
- * Parse the stored selected-pitches string into an ordered array of pitch
- * names. Null or empty yields an empty array.
- */
-const parseStoredPitches = (stored: string | null): string[] => {
-  if (stored === null || stored.trim() === '') {
-    return []
-  }
-  return stored
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s !== '')
 }
 
 /**
@@ -296,67 +282,74 @@ export const buildEtudeSplit = (app: Hono<{ Bindings: any }>): void => {
 
       const params = result.value
 
-      // Setup not confirmed: redirect to the canonical route.
-      if (!params.setupConfirmed) {
-        const canonical = resolveCanonicalRoute(params)
-        return redirectWithMessage(c, canonical, '')
-      }
-
-      // Notes not confirmed: redirect to the canonical route (notes).
-      if (!params.notesConfirmed) {
-        const canonical = resolveCanonicalRoute(params)
-        return redirectWithMessage(c, canonical, '')
-      }
-
-      // One-hand workflow: the split step is skipped. Redirect to the
-      // canonical route (review) and clear any previously stored boundary so
-      // a stale boundary from a prior two-hand selection never persists.
-      if (params.hand !== 'both') {
-        const canonical = resolveCanonicalRoute(params)
-        // Clear any stale split state. This is a corrective clear, not a
-        // student submission: it does not increment the version and does not
-        // unconfirm the notes step.
-        const clearResult = await clearEtudeSplit(db, user.id, params.aggregateEpoch, false)
-        if (clearResult.isErr) {
-          if (!clearResult.isOk) {
-            if (clearResult.error.kind === 'db-error') {
-              logError('etude split one-hand clear db error', {
-                error: sanitizeError(clearResult.error.error),
-              })
-              // Fall through to the redirect even on a db-error: the student
-              // still sees the canonical route. The stale boundary (if any)
-              // will be cleared on a future visit.
+      // If the split step's prerequisites are not met, redirect to the
+      // canonical route with a safe prerequisite-redirect message. This
+      // covers setup-unconfirmed, notes-unconfirmed, one-hand (split
+      // skipped), corrupt-state fewer-than-two-pitches, and
+      // stored-values-invalid rows (cross-cutting contract section 5). A
+      // completed split step remains visitable for editing even when the
+      // canonical route has moved past it. Side effects (one-hand clear,
+      // corrupt-state recovery) are triggered from the redirect branch —
+      // they are corrective clears, not ordering decisions.
+      if (!isStepReachable(params, PATHS.ETUDE_SPLIT)) {
+        const canonical = computeCanonicalRoute(params)
+        // One-hand workflow: clear any stale split state so a stale boundary
+        // from a prior two-hand selection never persists. This is a
+        // corrective clear, not a student submission: it does not increment
+        // the version and does not unconfirm the notes step.
+        if (params.hand !== 'both') {
+          const clearResult = await clearEtudeSplit(db, user.id, params.aggregateEpoch, false)
+          if (clearResult.isErr) {
+            if (!clearResult.isOk) {
+              if (clearResult.error.kind === 'db-error') {
+                logError('etude split one-hand clear db error', {
+                  error: sanitizeError(clearResult.error.error),
+                })
+                // Fall through to the redirect even on a db-error: the
+                // student still sees the canonical route. The stale boundary
+                // (if any) will be cleared on a future visit.
+              }
             }
           }
         }
-        return redirectWithMessage(c, canonical, '')
+
+        // Corrupt-state recovery: a two-hand aggregate holding fewer than
+        // two stored pitches (after filtering against the available set) is
+        // returned to the notes step. Clear the split state and unconfirm the
+        // notes step so the student re-selects pitches.
+        if (params.hand === 'both' && params.notesConfirmed) {
+          const octaves = parseStoredOctaves(params.selectedOctaves)
+          const availablePitches = deriveAvailablePitches(params.keySignature, octaves).pitches
+          const availableSet = new Set(availablePitches)
+          const storedPitches = parseStoredPitches(params.selectedPitches).filter((p) =>
+            availableSet.has(p),
+          )
+          if (storedPitches.length < 2) {
+            const clearResult = await clearEtudeSplit(db, user.id, params.aggregateEpoch, true)
+            if (clearResult.isErr) {
+              if (!clearResult.isOk) {
+                if (clearResult.error.kind === 'db-error') {
+                  logError('etude split corrupt-state clear db error', {
+                    error: sanitizeError(clearResult.error.error),
+                  })
+                }
+              }
+            }
+          }
+        }
+
+        return redirectWithPrerequisiteMessage(c, canonical, PREREQUISITE_REDIRECT_MESSAGE)
       }
 
-      // Two-hand workflow: derive the selected pitches and check for the
-      // corrupt-state recovery (fewer than two stored pitches).
+      // Two-hand workflow with the split step as the canonical route: derive
+      // the selected pitches (filtered against the available set) and the
+      // eligible boundaries.
       const octaves = parseStoredOctaves(params.selectedOctaves)
       const availablePitches = deriveAvailablePitches(params.keySignature, octaves).pitches
       const availableSet = new Set(availablePitches)
       const storedPitches = parseStoredPitches(params.selectedPitches).filter((p) =>
         availableSet.has(p),
       )
-
-      if (storedPitches.length < 2) {
-        // Corrupt-state recovery: a two-hand aggregate holding fewer than two
-        // stored pitches is returned to the notes step. Clear the split state
-        // and unconfirm the notes step so the student re-selects pitches.
-        const clearResult = await clearEtudeSplit(db, user.id, params.aggregateEpoch, true)
-        if (clearResult.isErr) {
-          if (!clearResult.isOk) {
-            if (clearResult.error.kind === 'db-error') {
-              logError('etude split corrupt-state clear db error', {
-                error: sanitizeError(clearResult.error.error),
-              })
-            }
-          }
-        }
-        return redirectWithMessage(c, PATHS.ETUDE_NOTES, '')
-      }
 
       // Derive the eligible boundaries from the selected pitches.
       const eligibleBoundaries = deriveEligibleBoundaries(storedPitches)
@@ -433,52 +426,63 @@ export const buildEtudeSplit = (app: Hono<{ Bindings: any }>): void => {
 
       const params = loadResult.value
 
-      // Setup or notes not confirmed: redirect to the canonical route.
-      if (!params.setupConfirmed || !params.notesConfirmed) {
-        const canonical = resolveCanonicalRoute(params)
-        return redirectWithMessage(c, canonical, '')
-      }
-
-      // One-hand workflow: the split step is skipped. Redirect to the
-      // canonical route (review) and clear any previously stored boundary.
-      if (params.hand !== 'both') {
-        const canonical = resolveCanonicalRoute(params)
-        const clearResult = await clearEtudeSplit(db, user.id, params.aggregateEpoch, false)
-        if (clearResult.isErr) {
-          if (!clearResult.isOk) {
-            if (clearResult.error.kind === 'db-error') {
-              logError('etude split one-hand clear db error', {
-                error: sanitizeError(clearResult.error.error),
-              })
+      // If the split step's prerequisites are not met, redirect with a safe
+      // prerequisite-redirect message. This covers setup-unconfirmed,
+      // notes-unconfirmed, one-hand (split skipped), corrupt-state
+      // fewer-than-two-pitches, and stored-values-invalid rows. Side effects
+      // (one-hand clear, corrupt-state recovery) are triggered from this
+      // branch.
+      if (!isStepReachable(params, PATHS.ETUDE_SPLIT)) {
+        const canonical = computeCanonicalRoute(params)
+        // One-hand workflow: clear any stale split state.
+        if (params.hand !== 'both') {
+          const clearResult = await clearEtudeSplit(db, user.id, params.aggregateEpoch, false)
+          if (clearResult.isErr) {
+            if (!clearResult.isOk) {
+              if (clearResult.error.kind === 'db-error') {
+                logError('etude split one-hand clear db error', {
+                  error: sanitizeError(clearResult.error.error),
+                })
+              }
             }
           }
         }
-        return redirectWithMessage(c, canonical, '')
+
+        // Corrupt-state recovery: a two-hand aggregate holding fewer than
+        // two stored pitches (after filtering against the available set).
+        if (params.hand === 'both' && params.notesConfirmed) {
+          const octaves = parseStoredOctaves(params.selectedOctaves)
+          const availablePitches = deriveAvailablePitches(params.keySignature, octaves).pitches
+          const availableSet = new Set(availablePitches)
+          const storedPitches = parseStoredPitches(params.selectedPitches).filter((p) =>
+            availableSet.has(p),
+          )
+          if (storedPitches.length < 2) {
+            const clearResult = await clearEtudeSplit(db, user.id, params.aggregateEpoch, true)
+            if (clearResult.isErr) {
+              if (!clearResult.isOk) {
+                if (clearResult.error.kind === 'db-error') {
+                  logError('etude split corrupt-state clear db error', {
+                    error: sanitizeError(clearResult.error.error),
+                  })
+                }
+              }
+            }
+          }
+        }
+
+        return redirectWithPrerequisiteMessage(c, canonical, PREREQUISITE_REDIRECT_MESSAGE)
       }
 
-      // Two-hand workflow: derive the selected pitches and check for the
-      // corrupt-state recovery (fewer than two stored pitches).
+      // Two-hand workflow with the split step as the canonical route: derive
+      // the selected pitches (filtered against the available set) and the
+      // eligible boundaries.
       const octaves = parseStoredOctaves(params.selectedOctaves)
       const availablePitches = deriveAvailablePitches(params.keySignature, octaves).pitches
       const availableSet = new Set(availablePitches)
       const storedPitches = parseStoredPitches(params.selectedPitches).filter((p) =>
         availableSet.has(p),
       )
-
-      if (storedPitches.length < 2) {
-        // Corrupt-state recovery: return to the notes step.
-        const clearResult = await clearEtudeSplit(db, user.id, params.aggregateEpoch, true)
-        if (clearResult.isErr) {
-          if (!clearResult.isOk) {
-            if (clearResult.error.kind === 'db-error') {
-              logError('etude split corrupt-state clear db error', {
-                error: sanitizeError(clearResult.error.error),
-              })
-            }
-          }
-        }
-        return redirectWithMessage(c, PATHS.ETUDE_NOTES, '')
-      }
 
       // Derive the eligible boundaries from the selected pitches.
       const eligibleBoundaries = deriveEligibleBoundaries(storedPitches)

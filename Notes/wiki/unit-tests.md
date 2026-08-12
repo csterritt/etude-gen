@@ -482,3 +482,17 @@ The catalog contribution built from the real packaged catalog by `buildCatalogHe
 - `isStepReachable`: returns true for /etude/setup when an aggregate exists (always reachable); returns true for a completed step (student can revisit to edit); returns false for /etude/split when one hand (split is skipped); returns false for later steps when prerequisites are not met; returns false when stored values are invalid.
 - The `PREREQUISITE_REDIRECT_MESSAGE` is non-empty and exposes no internal state or identifiers (no ids, version numbers, epoch values, pitch names, or boundary ids).
 - Purity: does not mutate its argument; does not throw for hostile input shapes or null aggregate.
+
+## review-predicate.spec.ts (Issue 19)
+
+10 tests covering the derived review predicate `isReviewReachable` (now exported from `src/lib/workflow-service.ts`) and the no-persisted-review-flag invariant:
+
+- `isReviewReachable` is a named export of `src/lib/workflow-service.ts` and is a function.
+- Truth table: for every combination of `setupConfirmed`, `notesConfirmed`, `splitConfirmed`, and `hand` in `{'left','right','both'}`, the predicate returns `true` exactly when `setupConfirmed && notesConfirmed && (hand !== 'both' || splitConfirmed)`.
+- One-hand mode: true when setup and notes are confirmed regardless of `splitConfirmed` (split is never required for one hand).
+- Two-hand mode: false when split is unconfirmed.
+- False when setup is unconfirmed even if everything else is confirmed.
+- False when notes are unconfirmed even if everything else is confirmed.
+- Purity: does not mutate its argument; does not throw on a snapshot with a null-ish hand value.
+- No persisted review-completion flag: the `EtudeParams` fixture has no key containing `review`.
+- The `GET /test/etude/aggregate-state` response keys (as documented in `src/routes/test/etude-downstream-state.ts`) include no stored review-completion field — the derived `isReviewReachable` key is the computed predicate, not a persisted column.

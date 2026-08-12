@@ -3,7 +3,8 @@
 // Issue 11 dependency map: which downstream state (pitch selection, duration
 // selection, split boundary, and the notes/split confirmation flags) must be
 // cleared when a given upstream setup field changes. Also tests isReviewReachable,
-// the derived (never persisted) review-completion predicate.
+// the derived (never persisted) review-completion predicate (Issue 19 moved
+// the predicate into src/lib/workflow-service.ts).
 // To run this, cd to this directory and type 'bun test'
 // ====================================
 
@@ -11,9 +12,9 @@ import { describe, it, expect } from 'bun:test'
 
 import {
   computeDownstreamInvalidation,
-  isReviewReachable,
 } from '../src/lib/etude-invalidation'
 import type { InvalidationPlan } from '../src/lib/etude-invalidation'
+import { isReviewReachable } from '../src/lib/workflow-service'
 import type { EtudeParams } from '../src/lib/etude-params-repository'
 import type { ValidSetup } from '../src/lib/setup-validator'
 

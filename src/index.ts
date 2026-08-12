@@ -18,6 +18,7 @@ import { buildEtude } from './routes/build-etude'
 import { buildEtudeNotes } from './routes/build-etude-notes'
 import { buildEtudeSplit } from './routes/build-etude-split'
 import { buildEtudeReview } from './routes/build-etude-review'
+import { buildEtudeGenerate } from './routes/build-etude-generate'
 import { build404 } from './routes/build-404'
 import { buildEmailConfirmation } from './routes/auth/build-email-confirmation'
 import { buildAwaitVerification } from './routes/auth/build-await-verification'
@@ -190,6 +191,7 @@ buildEtude(app)
 buildEtudeNotes(app)
 buildEtudeSplit(app)
 buildEtudeReview(app)
+buildEtudeGenerate(app)
 buildSignIn(app)
 if (env.SIGN_UP_MODE === SIGN_UP_MODES.OPEN_SIGN_UP) {
   buildSignUp(app)

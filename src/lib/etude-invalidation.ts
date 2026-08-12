@@ -13,8 +13,10 @@
  * there is no second, separate transition.
  *
  * Review completion is derived, never persisted (cross-cutting contract
- * section 5): `isReviewReachable` recomputes from the confirmation flags and
- * the hand selection, and there is no stored review flag to clear.
+ * section 5): the `isReviewReachable` predicate recomputes from the
+ * confirmation flags and the hand selection, and there is no stored review
+ * flag to clear. The predicate lives in `src/lib/workflow-service.ts`
+ * (Issue 19) alongside `computeCanonicalRoute` and `isStepReachable`.
  * @module lib/etude-invalidation
  */
 import type { EtudeParams } from './etude-params-repository'
@@ -103,30 +105,4 @@ export const computeDownstreamInvalidation = (
     unconfirmNotes,
     unconfirmSplit,
   }
-}
-
-/**
- * Derive whether the review step is reachable from the current aggregate
- * state, without consulting any stored review flag (none exists).
- *
- * Review is reachable exactly when setup is confirmed, the notes step is
- * confirmed, and — when both hands are selected — the split step is also
- * confirmed. For one-hand mode the split step is never required
- * (cross-cutting contract section 5). The function is pure: it reads only the
- * confirmation flags and `hand`, and does not touch the DB or mutate its
- * argument.
- * @param params - The current aggregate snapshot
- * @returns `true` when the review step is reachable
- */
-export const isReviewReachable = (params: EtudeParams): boolean => {
-  if (!params.setupConfirmed) {
-    return false
-  }
-  if (!params.notesConfirmed) {
-    return false
-  }
-  if (params.hand === 'both' && !params.splitConfirmed) {
-    return false
-  }
-  return true
 }

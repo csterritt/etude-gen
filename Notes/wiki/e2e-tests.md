@@ -283,3 +283,27 @@ A catalog and summaries of all end-to-end tests under `e2e-tests/`.
 - Stored values no longer validate — invalid stored boundary: a seeded state with a stored boundary not among the eligible boundaries redirects to /etude/split; following the redirect displays a safe message.
 
 The safe-message assertions check that the message text is non-empty and contains no internal state or identifiers (no `ep-`, `user-`, `workflowVersion`, `aggregateEpoch`, pitch names like `C4`, or boundary ids with `|`).
+
+## etude/25-etude-review-step.spec.ts (Issue 19)
+
+8 Playwright tests covering the Issue 19 full review step with the Generate form:
+
+- Two-hand: the review page lists every configured value including the split boundary and each hand pitch set (measures, meter, key, hands, pitches, durations, split boundary, left-hand pitches, right-hand pitches all present; the summary region contains no editable controls).
+- One-hand: the review page lists every configured value with no split information (the split-boundary, left-hand-pitches, and right-hand-pitches testids have count 0).
+- The Generate control is a POST form to `/etude/generate` (`data-testid="etude-generate-form"`) carrying the current `workflowVersion` in a hidden field, with a submit button (`data-testid="generate-action"`) that is visible, enabled, and not `aria-disabled`.
+- Two-hand: the Back link is an anchor issuing a GET to `/etude/split`; following it lands on the split step.
+- One-hand: the Back link is an anchor issuing a GET to `/etude/notes`; following it lands on the notes step.
+- An upstream change (key changed to G major) makes review unreachable until the affected downstream steps are completed again — a direct GET to `/etude/review` redirects 303 to `/etude/notes`; after re-completing notes and split, review is reachable again.
+- Loading `GET /etude/review` twice in succession leaves `workflowVersion`, `aggregateEpoch`, and every stored value byte-for-byte unchanged (asserted via the aggregate-state route before and after).
+- A `HEAD` request to `/etude/review` (and a repeated prefetch-style GET) changes nothing — the aggregate state is identical before and after.
+
+## etude/26-etude-generate-stub.spec.ts (Issue 19)
+
+4 Playwright tests covering the Issue 19 `POST /etude/generate` stub route:
+
+- A valid-precondition submission (current `workflowVersion`) yields a 303 redirect to `/etude/review` with a safe "not available yet" message displayed on the review page, and no state change — `workflowVersion`, `aggregateEpoch`, and every stored value are identical before and after; the stub does not increment the workflow version.
+- A missing `workflowVersion` field is refused with a 303 to the canonical route (`/etude/review` for a complete workflow) and a safe error, with no state change.
+- A tampered (non-numeric) `workflowVersion` is refused with a 303 to the canonical route and a safe error, with no state change.
+- A stale `workflowVersion` (decremented by 1) is refused with a 303 to the canonical route and a safe error, with no state change.
+
+The safe-message assertions check that the message text contains no internal identifiers (no `ep-`, `user-`, `workflowVersion`, `aggregateEpoch`, pitch names like `C4`, or boundary ids with `|`).

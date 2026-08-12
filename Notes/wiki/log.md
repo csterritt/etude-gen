@@ -416,3 +416,28 @@ New test files:
 - `e2e-tests/etude/24-etude-prerequisite-redirect.spec.ts` — 8 Playwright e2e tests covering prerequisite redirects with safe messages across all workflow states and stored-values-invalid rows.
 
 Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`, `project-overview.md`.
+
+## [2026-08-12] ingest | issue-019 review step and generate stub
+
+Ingested the full review step with Generate form and the `POST /etude/generate` stub route (issue #19).
+
+New source files:
+- `src/routes/build-etude-generate.tsx` — `POST /etude/generate` stub route: verifies the operation-POST precondition (version + epoch) via `checkOperationPrecondition`, does no external work, acquires no lock, does not increment the workflow version, and redirects 303 to `/etude/review` with a safe "not available yet" message on success, or to the canonical route with a safe error on a missing/tampered/stale version or epoch mismatch.
+
+Modified source files:
+- `src/routes/build-etude-review.tsx` — replaced the Issue 17 stub with the full review step: read-only summary, canonical GET Back link, and the Generate form (`POST /etude/generate`, hidden `workflowVersion`, `data-testid="generate-action"`). The GET handler remains side-effect-free.
+- `src/lib/workflow-service.ts` — `isReviewReachable` moved here from `src/lib/etude-invalidation.ts` (single canonical home alongside `computeCanonicalRoute` and `isStepReachable`); the `@module` doc updated to describe the derived review predicate and generation precondition.
+- `src/lib/etude-invalidation.ts` — `isReviewReachable` removed; the `@module` doc updated to note the predicate now lives in `workflow-service.ts`.
+- `src/routes/test/etude-downstream-state.ts` — import of `isReviewReachable` updated to `src/lib/workflow-service.ts`.
+- `src/constants.ts` — added `PATHS.ETUDE_GENERATE` (`/etude/generate`).
+- `src/index.ts` — registered `buildEtudeGenerate(app)` after `buildEtudeReview(app)`.
+
+New test files:
+- `tests/review-predicate.spec.ts` — 10 unit tests for `isReviewReachable` (now exported from `workflow-service.ts`) and the no-persisted-review-flag invariant.
+- `e2e-tests/etude/25-etude-review-step.spec.ts` — 8 Playwright e2e tests covering the full review step: summary content for one-hand and two-hand, the Generate form (POST, hidden version, visible/enabled submit), Back links, upstream-change unreachability, and the side-effect-free GET/HEAD invariant.
+- `e2e-tests/etude/26-etude-generate-stub.spec.ts` — 4 Playwright e2e tests covering the `POST /etude/generate` stub: valid-precondition 303 to review with safe "not available yet" message and no state change; missing/tampered/stale version refused with 303 to canonical route and safe error, no state change.
+
+Modified test files:
+- `tests/etude-invalidation.spec.ts` — import of `isReviewReachable` updated to `src/lib/workflow-service.ts`.
+
+Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`, `project-overview.md`.

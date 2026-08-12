@@ -4,7 +4,8 @@
 
 /**
  * Workflow service: canonical state-to-route resolution with stored-value
- * validation (Issue 18).
+ * validation (Issue 18), step reachability, and the derived review predicate
+ * (Issue 19).
  *
  * `computeCanonicalRoute` is the single entry point routes call to determine
  * the canonical route for the current workflow state. It delegates to
@@ -18,13 +19,24 @@
  * any stored value no longer validates, the workflow service routes to the
  * earliest step whose stored values are now invalid, treated as unconfirmed.
  *
+ * `isStepReachable` reports whether a step's prerequisites are met so a
+ * student can revisit a completed step to edit it without being redirected
+ * forward.
+ *
+ * `isReviewReachable` is the derived, never-persisted review-completion
+ * predicate and the generation precondition (Issue 19, cross-cutting contract
+ * section 5). It is computed from the snapshot's confirmation flags and
+ * `hand` — never from a stored review flag, because none exists in the
+ * aggregate. There is nothing for Issue 11 to clear: review simply stops
+ * being reachable when a downstream step loses its confirmation.
+ *
  * The score-related rows of section 5 (current Piece, render failure, stale
  * Piece) are deferred to Issues 20, 30, 31, and 32, which build the Piece and
  * render infrastructure. This module will be extended by those issues.
  *
- * The function is pure: it reads only the aggregate snapshot and the packaged
- * rhythm catalog constant, never mutates its argument, never throws on invalid
- * stored values (it routes instead), and never touches the DB.
+ * The functions are pure: they read only the aggregate snapshot and the
+ * packaged rhythm catalog constant, never mutate their argument, never throw
+ * on invalid stored values (they route instead), and never touch the DB.
  * @module lib/workflow-service
  */
 import { PATHS } from '../constants'
@@ -231,4 +243,35 @@ export const isStepReachable = (
   }
   const canonical = computeCanonicalRoute(params)
   return STEP_ORDER[canonical] >= STEP_ORDER[stepPath]
+}
+
+/**
+ * Derive whether the review step is reachable from the current aggregate
+ * state, without consulting any stored review flag (none exists).
+ *
+ * Review is reachable exactly when setup is confirmed, the notes step is
+ * confirmed, and — when both hands are selected — the split step is also
+ * confirmed. For one-hand mode the split step is never required
+ * (cross-cutting contract section 5). This predicate is the generation
+ * precondition (Issue 19): `POST /etude/generate` is offered on the review
+ * page exactly when this returns `true`, and a stale review (after an
+ * upstream change that unconfirms a downstream step) simply stops being
+ * reachable — no review flag is written or cleared, because none exists.
+ *
+ * The function is pure: it reads only the confirmation flags and `hand`, and
+ * does not touch the DB or mutate its argument.
+ * @param params - The current aggregate snapshot
+ * @returns `true` when the review step is reachable
+ */
+export const isReviewReachable = (params: EtudeParams): boolean => {
+  if (!params.setupConfirmed) {
+    return false
+  }
+  if (!params.notesConfirmed) {
+    return false
+  }
+  if (params.hand === 'both' && !params.splitConfirmed) {
+    return false
+  }
+  return true
 }

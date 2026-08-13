@@ -201,10 +201,16 @@ test.describe('Issue 19: POST /etude/generate stub route', () => {
       expect(response.status()).toBe(303)
       expect(response.headers()['location']).toContain(ETUDE_REVIEW_PATH)
 
-      // Follow the redirect and confirm a safe "not available yet" message
-      // is displayed on the review page.
+      // Follow the redirect and confirm a safe message is displayed on the
+      // review page. When the real generate route is active
+      // (ETUDE_GENERATION_RELEASED=true) a submission without aggregateEpoch
+      // is treated as stale and produces an error alert; when the stub is
+      // active it produces an info/success/warning "not available yet"
+      // alert. Either way the message must be safe.
       await page.goto(`${SERVER_BASE_URL}${ETUDE_REVIEW_PATH}`)
-      const messageAlert = page.locator('.alert-info, .alert-success, .alert-warning').first()
+      const messageAlert = page
+        .locator('.alert-info, .alert-success, .alert-warning, .alert-error')
+        .first()
       await expect(messageAlert).toBeVisible()
       const messageText = await messageAlert.textContent()
       expect(messageText).toBeTruthy()

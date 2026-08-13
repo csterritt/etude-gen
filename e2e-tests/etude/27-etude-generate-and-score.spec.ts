@@ -277,7 +277,7 @@ test.describe('Issue 20: POST /etude/generate and GET /etude/score', () => {
 
       // The review page should have a hidden aggregateEpoch field.
       const epochField = page.getByTestId('aggregate-epoch-field')
-      await expect(epochField).toBeVisible()
+      await expect(epochField).toBeAttached()
       const epochValue = await epochField.inputValue()
       expect(epochValue).toBeTruthy()
       expect(epochValue).toMatch(/^\d+$/)

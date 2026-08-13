@@ -33,7 +33,7 @@
 	"d1_databases": [
 		{
 			"binding": "PROJECT_DB",
-			"migrations_dir": "drizzle/migrations",
+			"migrations_dir": "drizzle",
 			"database_name": "etude-gen-db",
 			"database_id": "8e70ad45-45e8-4504-8363-d0ee84d5f7d1",
 		},

@@ -142,6 +142,7 @@ export const handleEtudeDownstreamState = (app: Hono<{ Bindings: any }>): void =
         selectedDurations: params.selectedDurations,
         splitBoundary: params.splitBoundary,
         workflowVersion: params.workflowVersion,
+        aggregateEpoch: params.aggregateEpoch,
         hand: params.hand,
         isReviewReachable: isReviewReachable(params),
       })

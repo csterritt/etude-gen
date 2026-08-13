@@ -168,6 +168,90 @@ export const etudeValidationState = sqliteTable('etude_validation_state', {
   createdAt: integer('createdAt').notNull(),
 })
 
+/**
+ * Etude current-Piece record — one current immutable Piece per owning student.
+ *
+ * Holds the immutable Piece JSON and render metadata. The Piece JSON is the
+ * single authority for the music: no seed or RNG state is stored (PRD "Piece
+ * model and generation"). `pieceId` is the server-generated UUID carried
+ * inside the Piece JSON, duplicated as a column so the `etude-<piece-short-id>`
+ * filename and owner-scoped lookups do not require parsing the JSON.
+ * `sourceParameterVersion` is the workflow version the Piece was generated
+ * from, duplicated as a column so the staleness check
+ * (`sourceParameterVersion === params.workflowVersion`) is efficient.
+ *
+ * The render-metadata columns (`svgArtifactKey`, `renderState`,
+ * `renderErrorCategory`, `lilypondVersion`) are nullable and unused in Issue 20;
+ * Issue 30 populates them. They live here rather than in a separate table so
+ * the current-Piece record is the single row describing the current Piece's
+ * lifecycle.
+ *
+ * The owner reference carries a database-level UNIQUE constraint so that one
+ * current Piece per owner is enforced independently of any application-level
+ * check. The FK cascades on user deletion. Physical columns are encapsulated
+ * behind the Etude Repository interface; routes and tests must not depend on
+ * them directly.
+ */
+export const etudePiece = sqliteTable('etude_piece', {
+  id: text('id').primaryKey(),
+  userId: text('userId')
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  pieceId: text('pieceId').notNull(),
+  pieceJson: text('pieceJson').notNull(),
+  sourceParameterVersion: integer('sourceParameterVersion').notNull(),
+  // Render metadata — nullable and unused in Issue 20; Issue 30 populates them.
+  svgArtifactKey: text('svgArtifactKey'),
+  renderState: text('renderState'),
+  renderErrorCategory: text('renderErrorCategory'),
+  lilypondVersion: text('lilypondVersion'),
+  createdAt: integer('createdAt', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull(),
+})
+
+/**
+ * Etude operation record — one per owning student.
+ *
+ * Holds the generation/render lock, the PDF lock, the independent success
+ * cooldown timestamps, and the temporary PDF grant. The generation/render lock
+ * and the PDF lock are separate locks with separate owner identifiers,
+ * acquisition times, and expiry (PRD "Data and concurrency"). The cooldown
+ * timestamps enforce the post-success cooldowns. The PDF grant columns carry
+ * the opaque grant identifier, expiry, and consumption timestamp.
+ *
+ * All columns are nullable and unused in Issue 20; Issues 33–37 populate them.
+ * The table is created here to avoid a second migration. The owner reference
+ * carries a database-level UNIQUE constraint so that one operation record per
+ * owner is enforced. The FK cascades on user deletion. Physical columns are
+ * encapsulated behind the Etude Repository interface; routes and tests must
+ * not depend on them directly.
+ */
+export const etudeOperation = sqliteTable('etude_operation', {
+  id: text('id').primaryKey(),
+  userId: text('userId')
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  // Generation/render in-flight lock (Issue 33).
+  generationLockOwner: text('generationLockOwner'),
+  generationLockAcquiredAt: integer('generationLockAcquiredAt', { mode: 'timestamp' }),
+  generationLockExpiresAt: integer('generationLockExpiresAt', { mode: 'timestamp' }),
+  // PDF in-flight lock (Issue 35, separate from the generation/render lock).
+  pdfLockOwner: text('pdfLockOwner'),
+  pdfLockAcquiredAt: integer('pdfLockAcquiredAt', { mode: 'timestamp' }),
+  pdfLockExpiresAt: integer('pdfLockExpiresAt', { mode: 'timestamp' }),
+  // Independent success cooldown timestamps (Issues 34, 37).
+  generationCooldownAt: integer('generationCooldownAt', { mode: 'timestamp' }),
+  pdfCooldownAt: integer('pdfCooldownAt', { mode: 'timestamp' }),
+  // Temporary PDF grant (Issues 35–36).
+  pdfGrantId: text('pdfGrantId'),
+  pdfGrantExpiresAt: integer('pdfGrantExpiresAt', { mode: 'timestamp' }),
+  pdfGrantConsumedAt: integer('pdfGrantConsumedAt', { mode: 'timestamp' }),
+  createdAt: integer('createdAt', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull(),
+})
+
 // Define schema object for export
 export const schema = {
   user,
@@ -178,6 +262,8 @@ export const schema = {
   singleUseCode,
   etudeParams,
   etudeValidationState,
+  etudePiece,
+  etudeOperation,
 }
 
 export type User = typeof user.$inferSelect
@@ -197,3 +283,7 @@ export type EtudeParam = typeof etudeParams.$inferSelect
 export type NewEtudeParam = typeof etudeParams.$inferInsert
 export type EtudeValidationState = typeof etudeValidationState.$inferSelect
 export type NewEtudeValidationState = typeof etudeValidationState.$inferInsert
+export type EtudePiece = typeof etudePiece.$inferSelect
+export type NewEtudePiece = typeof etudePiece.$inferInsert
+export type EtudeOperation = typeof etudeOperation.$inferSelect
+export type NewEtudeOperation = typeof etudeOperation.$inferInsert

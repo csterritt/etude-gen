@@ -4,13 +4,70 @@ A catalog and summaries of all unit tests under `tests/`.
 
 ## config-validator.spec.ts
 
-16 tests covering `validateEtudeConfig` from `src/lib/config-validator.ts`:
+25 tests covering `validateEtudeConfig` from `src/lib/config-validator.ts`:
 
 - Complete configuration passes and includes the resolved timeout.
 - Each individually missing value (`PROJECT_DB`, `ETUDE_GEN_STORAGE`, `LILYPOND_SERVICE_URL`, `LILYPOND_API_KEY`) fails and names that value.
 - `LILYPOND_TIMEOUT_MS` validation: defaults to 30,000 when absent; fails when non-numeric, zero, or negative; passes when positive.
 - Aggregate defect reporting: all defects reported together, not first-only.
 - No secret values in output: API key value never appears in any defect text.
+- `ETUDE_GENERATION_RELEASED` flag (Issue 20): resolves to a boolean; `"true"` releases; absent, empty, `"false"`, and garbage all resolve to not-released; absence never produces a defect; no secret leaked in the resolved flag payload.
+
+## piece-generator.spec.ts
+
+17 tests covering `generatePiece` from `src/lib/piece-generator.ts` (Issue 20):
+
+- Piece contract shape: `pieceId` is a UUID; key, time signature, hand, and `sourceParameterVersion` carried from settings.
+- Measure count: exactly the requested number of measures for one-hand and two-hand pieces.
+- Exact measure duration: every measure's right-hand durations sum exactly to the meter length (4/4 and 3/4); every rhythm pattern used is an eligible catalog pattern.
+- Pitch selection: every right-hand pitch from the right-hand set; every left-hand pitch from the left-hand set (two-hand).
+- Unused hand is empty: left-hand array empty for right-hand-only; right-hand array empty for left-hand-only.
+- JSON round-tripping: complete Piece JSON round-trips losslessly.
+- No mutation of input settings.
+- Typed invariant failures: `no-eligible-rhythms` when no eligible rhythm exists; `empty-pitch-set` when the active hand has an empty pitch set.
+
+## etude-piece-repository.spec.ts
+
+13 tests covering `persistEtudePiece`, `loadEtudePiece`, and `ensureEtudeOperation` from `src/lib/etude-piece-repository.ts` (Issue 20):
+
+- One Piece per user: persists and loads back; enforces one current-Piece record per owner.
+- Replacement semantics: a new Piece replaces the prior; the replaced Piece JSON is no longer stored.
+- Owner scoping: never returns another user's Piece; returns null when no Piece exists.
+- Cascade deletion: Piece record removed when the user row is deleted.
+- Epoch-conditional commit: rejects a stale epoch and leaves the prior Piece unchanged; rejects when no aggregate exists.
+- Round-trip JSON: stored `pieceJson` round-trips to the original Piece.
+- Operation record: creates one per owner; does not create a second on a second call; cascade-deletes with the user row.
+
+## etude-piece-contract.spec.ts
+
+3 schema-level contract tests for the persisted Piece record (Issue 20):
+
+- The `PieceRecord` domain interface exposes no seed, RNG, or regenerable field.
+- The `etude_piece` table in `schema.sql` declares no seed, RNG, or regenerable column.
+- The stored `pieceJson` is the only authority for its content (denormalized columns match the JSON fields).
+
+## etude-generate-operation.spec.ts
+
+10 tests covering `generateEtude` from `src/lib/workflow-service.ts` (Issue 20):
+
+- Success: creates and persists a Piece, returns a score-bound success; two-hand Piece has both hands populated.
+- Stale version: stale, missing, and tampered workflow versions redirect to the canonical route with no Piece created.
+- Prerequisites not satisfied: when the review predicate is false, redirects to the earliest incomplete step.
+- Stored values invalid: when stored pitches are invalid, redirects to the earliest invalid step.
+- Generator invariant failure: typed generator failure redirects to /etude/review with no Piece created.
+- Stale aggregate epoch at commit: redirects to the canonical route with nothing published.
+- No aggregate: redirects to the canonical route (setup).
+
+## canonical-route-piece.spec.ts
+
+16 tests covering the current-Piece extension to `resolveCanonicalRoute` and `computeCanonicalRoute` (Issue 20):
+
+- Routes to /etude/score when a current Piece exists and the review predicate is satisfied (one hand and both hands).
+- Routes to /etude/review when no current Piece exists; backward-compatible default when `hasCurrentPiece` is omitted.
+- Does not route to /etude/score when setup/notes/split are unconfirmed even if a current Piece exists.
+- Does not route to /etude/score when no aggregate exists.
+- Stored-value validation takes precedence: routes to /etude/notes or /etude/split when stored values are invalid, even with a current Piece.
+- Purity: does not mutate its argument.
 
 ## health-route.spec.ts
 

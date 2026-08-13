@@ -32,6 +32,15 @@ export interface ConfigValidationResult {
   readonly healthy: boolean
   /** The resolved LilyPond timeout in milliseconds. */
   readonly lilypondTimeoutMs: number
+  /**
+   * Whether etude generation is released for production traffic (Issue 20).
+   * Resolved to `true` exactly when `ETUDE_GENERATION_RELEASED` is the literal
+   * string `"true"`; every other value (absent, empty, `"false"`, garbage)
+   * resolves to `false`. This is a deployability gate, not a required-config
+   * value, so its absence never produces a defect. Removed once Issue 40
+   * lands; never client-controllable.
+   */
+  readonly generationReleased: boolean
   /** Every defect found, or an empty array when healthy. */
   readonly defects: readonly ConfigDefect[]
 }
@@ -45,6 +54,7 @@ export interface EtudeConfigInput {
   readonly LILYPOND_SERVICE_URL?: string
   readonly LILYPOND_API_KEY?: string
   readonly LILYPOND_TIMEOUT_MS?: string
+  readonly ETUDE_GENERATION_RELEASED?: string
 }
 
 /**
@@ -112,9 +122,16 @@ export const validateEtudeConfig = (input: EtudeConfigInput): ConfigValidationRe
     defects.push(timeoutDefect)
   }
 
+  // The generation-released flag is a deployability gate, not a required
+  // config value: its absence is a valid "not released" state and never
+  // produces a defect. It is released exactly when the literal string "true"
+  // is supplied; every other value resolves to not-released.
+  const generationReleased = input.ETUDE_GENERATION_RELEASED === 'true'
+
   return {
     healthy: defects.length === 0,
     lilypondTimeoutMs: timeoutMs,
+    generationReleased,
     defects,
   }
 }

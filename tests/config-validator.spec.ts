@@ -25,6 +25,7 @@ const completeInput = {
   LILYPOND_SERVICE_URL: 'https://lilypond.example.com',
   LILYPOND_API_KEY: 'secret-api-key-value',
   LILYPOND_TIMEOUT_MS: '45000',
+  ETUDE_GENERATION_RELEASED: '',
 }
 
 describe('validateEtudeConfig - complete configuration', () => {
@@ -177,5 +178,75 @@ describe('validateEtudeConfig - no secret values in output', () => {
     for (const defect of result.defects) {
       expect(defect.message).not.toContain('secret-api-key-value')
     }
+  })
+})
+
+describe('validateEtudeConfig - ETUDE_GENERATION_RELEASED flag', () => {
+  it('should expose a resolved generationReleased boolean on the result', () => {
+    const result = validateEtudeConfig(completeInput)
+    expect(typeof result.generationReleased).toBe('boolean')
+  })
+
+  it('should resolve to not-released when ETUDE_GENERATION_RELEASED is absent', () => {
+    const { ETUDE_GENERATION_RELEASED: _removed, ...rest } = completeInput
+    const result = validateEtudeConfig(rest)
+    expect(result.generationReleased).toBe(false)
+  })
+
+  it('should resolve to released when ETUDE_GENERATION_RELEASED is the literal "true"', () => {
+    const result = validateEtudeConfig({
+      ...completeInput,
+      ETUDE_GENERATION_RELEASED: 'true',
+    })
+    expect(result.generationReleased).toBe(true)
+  })
+
+  it('should resolve to not-released when ETUDE_GENERATION_RELEASED is "false"', () => {
+    const result = validateEtudeConfig({
+      ...completeInput,
+      ETUDE_GENERATION_RELEASED: 'false',
+    })
+    expect(result.generationReleased).toBe(false)
+  })
+
+  it('should resolve to not-released when ETUDE_GENERATION_RELEASED is an empty string', () => {
+    const result = validateEtudeConfig({
+      ...completeInput,
+      ETUDE_GENERATION_RELEASED: '',
+    })
+    expect(result.generationReleased).toBe(false)
+  })
+
+  it('should resolve to not-released when ETUDE_GENERATION_RELEASED is garbage', () => {
+    const result = validateEtudeConfig({
+      ...completeInput,
+      ETUDE_GENERATION_RELEASED: 'yes-please',
+    })
+    expect(result.generationReleased).toBe(false)
+  })
+
+  it('should not produce a defect when ETUDE_GENERATION_RELEASED is absent (absence is a valid not-released state)', () => {
+    const { ETUDE_GENERATION_RELEASED: _removed, ...rest } = completeInput
+    const result = validateEtudeConfig(rest)
+    expect(result.healthy).toBe(true)
+    expect(result.defects.some((d) => d.valueName === 'ETUDE_GENERATION_RELEASED')).toBe(false)
+  })
+
+  it('should not produce a defect when ETUDE_GENERATION_RELEASED is "false"', () => {
+    const result = validateEtudeConfig({
+      ...completeInput,
+      ETUDE_GENERATION_RELEASED: 'false',
+    })
+    expect(result.healthy).toBe(true)
+    expect(result.defects.some((d) => d.valueName === 'ETUDE_GENERATION_RELEASED')).toBe(false)
+  })
+
+  it('should not leak any secret value in the resolved flag payload', () => {
+    const result = validateEtudeConfig({
+      ...completeInput,
+      ETUDE_GENERATION_RELEASED: 'true',
+    })
+    const payload = JSON.stringify(result)
+    expect(payload).not.toContain('secret-api-key-value')
   })
 })

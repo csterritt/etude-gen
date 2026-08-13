@@ -307,3 +307,19 @@ The safe-message assertions check that the message text is non-empty and contain
 - A stale `workflowVersion` (decremented by 1) is refused with a 303 to the canonical route and a safe error, with no state change.
 
 The safe-message assertions check that the message text contains no internal identifiers (no `ep-`, `user-`, `workflowVersion`, `aggregateEpoch`, pitch names like `C4`, or boundary ids with `|`).
+
+## etude/27-etude-generate-and-score.spec.ts (Issue 20)
+
+9 Playwright tests covering the Issue 20 `POST /etude/generate` and `GET /etude/score` routes:
+
+- A valid-precondition submission (current `workflowVersion` and `aggregateEpoch`) generates a Piece and redirects 303 to `/etude/score`.
+- `GET /etude/score` renders the score page with `data-testid="etude-score-content"` after generation.
+- A missing `workflowVersion` is refused with a 303 to the canonical route (`/etude/review`) and a safe error, with no Piece created.
+- A tampered (non-numeric) `workflowVersion` is refused with a 303 to the canonical route and a safe error.
+- A stale `workflowVersion` is refused with a 303 to the canonical route and a safe error, with no Piece created.
+- The generate form on the review page carries a hidden `aggregateEpoch` field (`data-testid="aggregate-epoch-field"`).
+- `GET /etude/score` redirects to the canonical route (`/etude/review`) when no current Piece exists.
+- `GET /etude/score` redirects to the canonical route (`/etude/setup`) when prerequisites are not met.
+- After generation, `GET /etude` redirects to `/etude/score` (canonical route with current Piece).
+
+The safe-message assertions check that the message text contains no internal identifiers (no `ep-`, `user-`, `workflowVersion`, `aggregateEpoch`, pitch names like `C4`, or boundary ids with `|`).

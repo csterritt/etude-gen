@@ -31,6 +31,7 @@ import { useLayout } from './build-layout'
 import { signedInAccess } from '../middleware/signed-in-access'
 import { loadOrCreateEtudeParams, loadEtudeParams, updateEtudeSetup } from '../lib/etude-params-repository'
 import type { EtudeParams } from '../lib/etude-params-repository'
+import { loadEtudePiece } from '../lib/etude-piece-repository'
 import { computeCanonicalRoute } from '../lib/workflow-service'
 import { handleUnexpectedError } from './build-safe-error'
 import { logError, sanitizeError } from '../lib/logger'
@@ -371,7 +372,12 @@ export const buildEtude = (app: Hono<{ Bindings: Bindings }>): void => {
         return handleUnexpectedError(c as unknown as Context<AppEnv>, result.error)
       }
 
-      const canonicalRoute = computeCanonicalRoute(result.value)
+      // Load the current Piece record to determine whether the canonical
+      // route should be /etude/score (Issue 20).
+      const pieceResult = await loadEtudePiece(db, user.id)
+      const hasCurrentPiece = pieceResult.isOk && pieceResult.value !== null
+
+      const canonicalRoute = computeCanonicalRoute(result.value, hasCurrentPiece)
       return redirectWithMessage(c, canonicalRoute, '')
     },
   )

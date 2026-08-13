@@ -47,12 +47,20 @@ const countSelectedPitches = (selectedPitches: string | null): number => {
  * no longer met). Returns `/etude/split` when both hands are selected, the
  * notes step is confirmed, and the split step is unconfirmed. Returns
  * `/etude/review` when one hand is selected and notes are confirmed (split
- * skipped), or when both hands are selected and the split step is confirmed.
- * Later issues extend this with the score rows.
+ * skipped), or when both hands are selected and the split step is confirmed,
+ * and no current Piece exists. Returns `/etude/score` when the review
+ * predicate is satisfied and a current Piece exists (Issue 20).
+ *
+ * The `hasCurrentPiece` argument defaults to `false` for backward
+ * compatibility with callers that do not yet load the Piece record.
  * @param params - The owner's aggregate snapshot, or null when none exists
+ * @param hasCurrentPiece - Whether a current Piece record exists for the owner
  * @returns The canonical route path
  */
-export const resolveCanonicalRoute = (params: EtudeParams | null): string => {
+export const resolveCanonicalRoute = (
+  params: EtudeParams | null,
+  hasCurrentPiece: boolean = false,
+): string => {
   if (params === null) {
     return PATHS.ETUDE_SETUP
   }
@@ -85,7 +93,11 @@ export const resolveCanonicalRoute = (params: EtudeParams | null): string => {
   }
 
   // One hand with notes confirmed (split skipped), or both hands with split
-  // confirmed: the review step is the canonical route. Later issues extend
-  // this with the score rows.
+  // confirmed: the review predicate is satisfied. When a current Piece
+  // exists, the canonical route is /etude/score (Issue 20); otherwise it is
+  // /etude/review.
+  if (hasCurrentPiece) {
+    return PATHS.ETUDE_SCORE
+  }
   return PATHS.ETUDE_REVIEW
 }

@@ -67,6 +67,7 @@ const renderEtudeReview = (params: {
   selectedDurations: string | null
   splitBoundary: string | null
   workflowVersion: number
+  aggregateEpoch: number
 }) => {
   const backTarget = params.hand === 'both' ? PATHS.ETUDE_SPLIT : PATHS.ETUDE_NOTES
   return (
@@ -93,6 +94,12 @@ const renderEtudeReview = (params: {
                 name='workflowVersion'
                 value={String(params.workflowVersion)}
                 data-testid='workflow-version-field'
+              />
+              <input
+                type='hidden'
+                name='aggregateEpoch'
+                value={String(params.aggregateEpoch)}
+                data-testid='aggregate-epoch-field'
               />
               <button
                 type='submit'

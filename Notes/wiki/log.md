@@ -441,3 +441,39 @@ Modified test files:
 - `tests/etude-invalidation.spec.ts` — import of `isReviewReachable` updated to `src/lib/workflow-service.ts`.
 
 Wiki pages updated: `source-code.md`, `unit-tests.md`, `e2e-tests.md`, `project-overview.md`.
+
+## [2026-08-13] ingest | issue-020 generate immutable piece persistence
+
+Ingested the Piece generation, persistence, and score route for the etude feature (Issue 20).
+
+New source files:
+- `src/lib/piece-generator.ts` — immutable, presentation-independent Piece generator with injectable random source; no seed persisted.
+- `src/lib/etude-piece-repository.ts` — epoch-conditional upsert for the current-Piece record and one-per-user operation record.
+- `src/routes/build-etude-score.tsx` — GET /etude/score route rendering the current Piece; capability-flag gated.
+- `drizzle/0004_busy_titanium_man.sql` — migration adding `etude_piece` and `etude_operation` tables.
+
+Modified source files:
+- `src/db/schema.ts` — added `etude_piece` and `etude_operation` tables with UNIQUE userId constraints and cascade deletion.
+- `src/lib/config-validator.ts` — added `generationReleased` boolean resolved from `ETUDE_GENERATION_RELEASED` var.
+- `src/lib/canonical-route.ts` — extended `resolveCanonicalRoute` with optional `hasCurrentPiece` parameter for the score row.
+- `src/lib/workflow-service.ts` — extended `computeCanonicalRoute` with `hasCurrentPiece`; added `generateEtude` operation.
+- `src/routes/build-etude-generate.tsx` — replaced Issue 19 stub with real generation via `generateEtude`.
+- `src/routes/build-etude-review.tsx` — added hidden `aggregateEpoch` field to the Generate form.
+- `src/routes/build-etude.tsx` — `GET /etude` now loads the current Piece to determine the canonical route.
+- `src/index.ts` — registered `buildEtudeScore` with capability-flag gating.
+- `src/constants.ts` — added `ETUDE_SCORE` path.
+- `src/local-types.ts` — added `ETUDE_GENERATION_RELEASED` binding type.
+- `wrangler.jsonc` — added `ETUDE_GENERATION_RELEASED` var.
+
+New test files:
+- `tests/piece-generator.spec.ts` — 17 tests for the Piece Generator contract.
+- `tests/etude-piece-repository.spec.ts` — 13 tests for the Piece and operation repository.
+- `tests/etude-piece-contract.spec.ts` — 3 schema-level contract tests (no seed/RNG/regenerable field).
+- `tests/etude-generate-operation.spec.ts` — 10 tests for the workflow service generate operation.
+- `tests/canonical-route-piece.spec.ts` — 16 tests for the canonical-route current-Piece extension.
+- `e2e-tests/etude/27-etude-generate-and-score.spec.ts` — 9 Playwright tests for POST /etude/generate and GET /etude/score.
+
+Modified test files:
+- `tests/config-validator.spec.ts` — added 9 tests for the `generationReleased` flag.
+
+Wiki pages updated: `source-code.md`.

@@ -50,6 +50,13 @@ export interface Bindings {
   LILYPOND_API_KEY?: string
   /** LilyPond request timeout in milliseconds; defaults to 30,000 when absent. */
   LILYPOND_TIMEOUT_MS?: string
+  /**
+   * Deployability gate for etude generation (Issue 20). When the literal
+   * string "true", `POST /etude/generate` and `GET /etude/score` are
+   * registered; otherwise they behave as unknown routes. Removed once Issue
+   * 40 lands; never client-controllable.
+   */
+  ETUDE_GENERATION_RELEASED?: string
   /** Operator token gating the privileged detailed health report. */
   OPERATOR_TOKEN?: string
 }

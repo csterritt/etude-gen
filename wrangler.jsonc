@@ -27,7 +27,8 @@
 		"signUpType": "",
 		"LILYPOND_SERVICE_URL": "",
 		"LILYPOND_API_KEY": "",
-		"LILYPOND_TIMEOUT_MS": ""
+		"LILYPOND_TIMEOUT_MS": "",
+		"ETUDE_GENERATION_RELEASED": ""
 	},
 	"d1_databases": [
 		{

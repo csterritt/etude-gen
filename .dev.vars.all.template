@@ -16,3 +16,5 @@ ALTERNATE_ORIGIN='<an alternate URL to your app, e.g. via tailscale>'
 NODE_ENV=development
 BETTER_AUTH_SECRET='set-your-per-site-secret-here'
 ENABLE_TEST_ROUTES=true
+
+ETUDE_GENERATION_RELEASED="true"

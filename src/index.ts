@@ -19,6 +19,7 @@ import { buildEtudeNotes } from './routes/build-etude-notes'
 import { buildEtudeSplit } from './routes/build-etude-split'
 import { buildEtudeReview } from './routes/build-etude-review'
 import { buildEtudeGenerate } from './routes/build-etude-generate'
+import { buildEtudeScore } from './routes/build-etude-score'
 import { build404 } from './routes/build-404'
 import { buildEmailConfirmation } from './routes/auth/build-email-confirmation'
 import { buildAwaitVerification } from './routes/auth/build-await-verification'
@@ -192,6 +193,12 @@ buildEtudeNotes(app)
 buildEtudeSplit(app)
 buildEtudeReview(app)
 buildEtudeGenerate(app)
+// Capability-flag gating: the score route is registered only when
+// ETUDE_GENERATION_RELEASED is the literal "true". When not released, the
+// route behaves as unknown (404). Removed once Issue 40 lands.
+if ((env.ETUDE_GENERATION_RELEASED as string) === 'true') {
+  buildEtudeScore(app)
+}
 buildSignIn(app)
 if (env.SIGN_UP_MODE === SIGN_UP_MODES.OPEN_SIGN_UP) {
   buildSignUp(app)
